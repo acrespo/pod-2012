@@ -14,16 +14,16 @@ import ar.edu.itba.pod.signal.source.Source;
 
 public class ResultTest {
 	private Source src;
-	
+
 	@Before
 	public void setup() {
-		this.src = new RandomSource(1);
+		src = new RandomSource(1);
 	}
-	
+
 	@Test
 	public void resultStartsEmpty() {
 		Result r = new Result(src.next());
-		
+
 		assertEquals(r.size(), 0);
 	}
 
@@ -41,8 +41,8 @@ public class ResultTest {
 			lastDev = item.deviation();
 		}
 	}
-	
-	@Test 
+
+	@Test
 	public void maxSizeIsHonored() {
 		Result r = new Result(src.next(), 2, new TreeSet<Result.Item>());
 		r = r.include(new Item(src.next(), 3.0));
@@ -50,7 +50,7 @@ public class ResultTest {
 		r = r.include(new Item(src.next(), 4.0));
 
 		assertEquals(2, r.size());
-		
+
 		double lastDev = 0.0;
 		for (Result.Item item : r.items()) {
 			assertTrue(lastDev < item.deviation());
