@@ -1,5 +1,7 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +12,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import org.jgroups.Address;
+import org.jgroups.JChannel;
+import org.jgroups.Message;
+import org.jgroups.Receiver;
+import org.jgroups.View;
+
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
@@ -21,15 +28,18 @@ import ar.edu.itba.pod.api.SignalProcessor;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
-public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
+public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
+		Receiver {
 	private final BlockingQueue<Signal> signals = new LinkedBlockingQueue<>();
 	private final ListeningExecutorService service;
 	private final int threads;
+	private final JChannel channel;
 
-	public MultiThreadedSignalProcessor(final int threads) {
+	public MultiThreadedSignalProcessor(final int threads) throws Exception {
 		this.threads = threads;
 		service = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
+		channel = new JChannel();
 	}
 
 	private static class SearchCallable implements Callable<List<Result.Item>> {
@@ -60,7 +70,13 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public void join(final String clusterName) throws RemoteException {
-		throw new NotImplementedException();
+		try {
+			channel.connect(clusterName);
+		} catch (Exception e) {
+			throw new RemoteException(e.getMessage());
+		}
+		channel.setReceiver(this);
+		System.out.println("Joining cluster " + clusterName);
 	}
 
 	@Override
@@ -70,7 +86,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
-		throw new NotImplementedException();
+		throw new RemoteException("Not yet implemented :D");
 	}
 
 	@Override
@@ -125,5 +141,46 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		}
 
 		return result;
+	}
+
+	@Override
+	public void receive(final Message msg) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void getState(final OutputStream output) throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void setState(final InputStream input) throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void viewAccepted(final View new_view) {
+		System.out.println(new_view);
+	}
+
+	@Override
+	public void suspect(final Address suspected_mbr) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void block() {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void unblock() {
+		// TODO Auto-generated method stub
+
 	}
 }
