@@ -19,10 +19,12 @@ import ar.edu.itba.pod.legajo51190.impl.MultiThreadedSignalProcessor;
 public class Server {
 	private final int port;
 	private final int nthreads;
+	private final String channel;
 
-	public Server(final int port, final int nthreads) {
+	public Server(final int port, final int nthreads, final String channel) {
 		this.port = port;
 		this.nthreads = nthreads;
+		this.channel = channel;
 	}
 
 	public static void main(final String[] args) {
@@ -34,6 +36,7 @@ public class Server {
 
 		int port;
 		int nthreads;
+		String channel = null;
 		try {
 			port = Integer.parseInt(args[0]);
 		} catch (Exception e) {
@@ -47,7 +50,13 @@ public class Server {
 					+ Runtime.getRuntime().availableProcessors());
 			nthreads = Runtime.getRuntime().availableProcessors();
 		}
-		new Server(port, nthreads).start();
+
+		try {
+			channel = args[2];
+		} catch (Exception e) {
+		}
+
+		new Server(port, nthreads, channel).start();
 	}
 
 	private void start() {
@@ -62,7 +71,14 @@ public class Server {
 			reg.bind("SignalProcessor", proxy);
 			reg.bind("SPNode", proxy);
 			System.out.println("Server started and listening on port " + port);
+
+			if (channel != null) {
+				impl.join(channel);
+				System.out.println("Node joining channel");
+			}
+
 			System.out.println("Press <enter> to quit");
+
 			new BufferedReader(new InputStreamReader(System.in)).readLine();
 
 		} catch (RemoteException e) {
