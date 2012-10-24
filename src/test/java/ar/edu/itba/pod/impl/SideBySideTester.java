@@ -15,6 +15,7 @@ import java.util.Arrays;
 import org.junit.Before;
 import org.junit.Test;
 
+import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.signal.source.RandomSource;
@@ -52,14 +53,10 @@ public abstract class SideBySideTester {
 
 	@Test
 	public void test02() throws RemoteException {
-		long t1, t2;
 		addNoise(10000);
 		add(constant((byte) 4));
 		add(constant((byte) 10));
-		t1 = System.currentTimeMillis();
 		assertFind(constant((byte) 6));
-		t2 = System.currentTimeMillis();
-		System.out.println("Time total to find: " + (t2 - t1));
 	}
 
 	@Test
@@ -133,7 +130,15 @@ public abstract class SideBySideTester {
 
 	private void assertFind(final Signal s) throws RemoteException {
 		assertEquals(1, 1);
-		assertEquals(reference.findSimilarTo(s), toTest.findSimilarTo(s));
+		long t1, t2, t3;
+		t1 = System.currentTimeMillis();
+		Result first = toTest.findSimilarTo(s);
+		t2 = System.currentTimeMillis();
+		Result second = reference.findSimilarTo(s);
+		t3 = System.currentTimeMillis();
+		assertEquals(second, first);
+		System.out.println("Time total to find impl:" + (t2 - t1));
+		System.out.println("Time total to find reference:" + (t3 - t2));
 	}
 
 	private void add(final Signal s) throws RemoteException {

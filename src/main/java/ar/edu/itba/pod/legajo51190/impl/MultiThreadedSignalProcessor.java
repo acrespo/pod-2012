@@ -78,6 +78,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		signals.add(signal);
 	}
 
+	@SuppressWarnings("unused")
 	@Override
 	public Result findSimilarTo(final Signal signal) throws RemoteException {
 		if (signal == null) {
@@ -96,15 +97,22 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 			queries.add(new SearchCallable(querySignals, signal));
 		}
 
+		long t1, t2, t3;
+
 		try {
+			t1 = System.currentTimeMillis();
 			List<Future<List<Item>>> results = service.invokeAll(queries);
-			System.out.println("Comparing future sizes");
+			t2 = System.currentTimeMillis();
+
 			for (Future<List<Item>> future : results) {
-				System.out.println(future.get().size());
 				for (Item item : future.get()) {
 					result = result.include(item);
 				}
 			}
+			t3 = System.currentTimeMillis();
+
+			// System.out.println("---- Multithreaded time: " + (t2 - t1));
+			// System.out.println("---- Join time: " + (t3 - t2));
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} catch (ExecutionException e) {

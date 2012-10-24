@@ -19,8 +19,7 @@ public class SideBySideKikisTest extends SideBySideExampleTester {
 			System.out
 					.println("Starting Own SignalProcessor and showing via RMI...");
 			Registry reg = LocateRegistry.createRegistry(20000);
-			// SignalProcessor sp = new StandaloneSignalProcessor();
-			SignalProcessor sp = new MultiThreadedSignalProcessor(4);
+			SignalProcessor sp = new MultiThreadedSignalProcessor(2);
 			Remote proxy = UnicastRemoteObject.exportObject(sp, 0);
 			reg.bind("SignalProcessor", proxy);
 			reg.bind("SPNode", proxy);
