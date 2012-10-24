@@ -2,7 +2,9 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -34,12 +36,11 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	private static class SearchCallable implements Callable<List<Result.Item>> {
 
-		private final BlockingQueue<Signal> querySignals;
+		private final Iterator<Signal> querySignals;
 		private final Signal signal;
 
-		public SearchCallable(final BlockingQueue<Signal> querySignals,
+		public SearchCallable(final Iterator<Signal> querySignals,
 				final Signal signal) {
-			super();
 			this.querySignals = querySignals;
 			this.signal = signal;
 		}
@@ -47,11 +48,15 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		@Override
 		public List<Item> call() throws Exception {
 			List<Item> items = new ArrayList<>();
-			while (!querySignals.isEmpty()) {
-				Signal toAnalyze = querySignals.poll();
-				if (toAnalyze != null) {
-					items.add(new Result.Item(toAnalyze, signal
-							.findDeviation(toAnalyze)));
+			while (querySignals.hasNext()) {
+				try {
+					Signal toAnalyze = querySignals.next();
+					if (toAnalyze != null) {
+						items.add(new Result.Item(toAnalyze, signal
+								.findDeviation(toAnalyze)));
+					}
+				} catch (NoSuchElementException e) {
+
 				}
 			}
 			return items;
@@ -75,7 +80,10 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public void add(final Signal signal) throws RemoteException {
-		signals.add(signal);
+		synchronized (signals) {
+			signals.add(signal);
+		}
+
 	}
 
 	@SuppressWarnings("unused")
@@ -87,9 +95,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 		Result result = new Result(signal);
 
-		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
-
-		querySignals.addAll(signals);
+		final Iterator<Signal> querySignals = signals.iterator();
 
 		List<SearchCallable> queries = new ArrayList<>();
 
