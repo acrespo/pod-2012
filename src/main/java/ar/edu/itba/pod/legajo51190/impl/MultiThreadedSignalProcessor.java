@@ -13,6 +13,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.jgroups.Address;
+import org.jgroups.Channel;
+import org.jgroups.ChannelListener;
 import org.jgroups.JChannel;
 import org.jgroups.Message;
 import org.jgroups.Receiver;
@@ -29,7 +31,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
-		Receiver {
+		Receiver, ChannelListener {
 	private final BlockingQueue<Signal> signals = new LinkedBlockingQueue<>();
 	private final ListeningExecutorService service;
 	private final int threads;
@@ -76,6 +78,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
 			throw new RemoteException(e.getMessage());
 		}
 		channel.setReceiver(this);
+		channel.addChannelListener(this);
 		System.out.println("Joining cluster " + clusterName);
 	}
 
@@ -145,8 +148,6 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
 
 	@Override
 	public void receive(final Message msg) {
-		// TODO Auto-generated method stub
-
 	}
 
 	@Override
@@ -168,8 +169,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
 
 	@Override
 	public void suspect(final Address suspected_mbr) {
-		// TODO Auto-generated method stub
-
+		System.out.println(suspected_mbr);
 	}
 
 	@Override
@@ -182,5 +182,20 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode,
 	public void unblock() {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public void channelConnected(final Channel channel) {
+		System.out.println("Connected to " + channel);
+	}
+
+	@Override
+	public void channelDisconnected(final Channel channel) {
+		System.out.println("Disconected from " + channel);
+	}
+
+	@Override
+	public void channelClosed(final Channel channel) {
+		System.out.println("Channel closed " + channel);
 	}
 }
