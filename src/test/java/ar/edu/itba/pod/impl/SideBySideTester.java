@@ -52,10 +52,14 @@ public abstract class SideBySideTester {
 
 	@Test
 	public void test02() throws RemoteException {
-		addNoise(1000);
+		long t1, t2;
+		addNoise(10000);
 		add(constant((byte) 4));
 		add(constant((byte) 10));
+		t1 = System.currentTimeMillis();
 		assertFind(constant((byte) 6));
+		t2 = System.currentTimeMillis();
+		System.out.println("Time total to find: " + (t2 - t1));
 	}
 
 	@Test
