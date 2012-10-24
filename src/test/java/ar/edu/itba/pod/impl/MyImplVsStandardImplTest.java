@@ -16,7 +16,8 @@ public class MyImplVsStandardImplTest extends SideBySideTester {
 	@Override
 	protected SignalProcessor init() throws Exception {
 		if (sp == null) {
-			sp = new MultiThreadedSignalProcessor(2);
+			sp = new MultiThreadedSignalProcessor(Runtime.getRuntime()
+					.availableProcessors());
 		}
 		((MultiThreadedSignalProcessor) sp).exit();
 		return sp;
