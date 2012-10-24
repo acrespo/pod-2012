@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>ar.edu.itba.pod</groupId>
-  <artifactId>ar.edu.itba.pod.legajo51190</artifactId>
+  <artifactId>legajo51190</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
