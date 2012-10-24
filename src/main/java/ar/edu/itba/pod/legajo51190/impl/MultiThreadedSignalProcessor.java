@@ -1,47 +1,36 @@
-package ar.edu.itba.pod.impl;
+package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 
-/**
- * Simple implementation of a signal processor that works on a single thread and
- * a single node.
- */
-public class StandaloneSignalProcessor implements SignalProcessor, SPNode {
-	private final Set<Signal> signals = new HashSet<>();
-	private int receivedSignals = 0;
-	private String cluster = null;
+public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
+	private final BlockingQueue<Signal> signals = new LinkedBlockingQueue<>();
+
+	public MultiThreadedSignalProcessor(final int threads) {
+
+	}
 
 	@Override
 	public void join(final String clusterName) throws RemoteException {
-		if (cluster != null) {
-			throw new IllegalStateException("Already in cluster " + cluster);
-		}
-		if (!signals.isEmpty()) {
-			throw new IllegalStateException(
-					"Can't join a cluster because there are signals already stored");
-		}
-		cluster = clusterName;
+		throw new NotImplementedException();
 	}
 
 	@Override
 	public void exit() throws RemoteException {
 		signals.clear();
-		receivedSignals = 0;
-		cluster = null;
 	}
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
-		return new NodeStats(cluster == null ? "standalone" : "cluster "
-				+ cluster, receivedSignals, signals.size(), 0, true);
+		throw new NotImplementedException();
 	}
 
 	@Override
@@ -55,7 +44,6 @@ public class StandaloneSignalProcessor implements SignalProcessor, SPNode {
 			throw new IllegalArgumentException("Signal cannot be null");
 		}
 
-		receivedSignals++;
 		Result result = new Result(signal);
 
 		for (Signal cmp : signals) {
@@ -64,4 +52,5 @@ public class StandaloneSignalProcessor implements SignalProcessor, SPNode {
 		}
 		return result;
 	}
+
 }
