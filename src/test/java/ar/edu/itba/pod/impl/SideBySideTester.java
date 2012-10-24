@@ -53,7 +53,7 @@ public abstract class SideBySideTester {
 
 	@Test
 	public void test02() throws RemoteException {
-		addNoise(100000);
+		addNoise(10000);
 		add(constant((byte) 4));
 		add(constant((byte) 10));
 		assertFind(constant((byte) 6));
