@@ -9,7 +9,7 @@ import ar.edu.itba.pod.legajo51190.impl.MultiThreadedSignalProcessor;
  * 
  * @author cris
  */
-public class NoRmiSideBySideTest extends SideBySideTester {
+public class MyImplVsStandardImplTest extends SideBySideTester {
 
 	private static SignalProcessor sp;
 
