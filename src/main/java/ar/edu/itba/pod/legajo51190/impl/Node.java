@@ -1,6 +1,6 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
-import java.util.concurrent.BlockingQueue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -21,13 +21,17 @@ public class Node implements JGroupNode {
 	private View lastView;
 	private Address nodeAddress;
 	private final AtomicBoolean isDegraded = new AtomicBoolean(false);
-	private final BlockingQueue<Signal> signals;
+	private final Set<Signal> signals;
+	private final Set<Signal> toDistributeSignals;
+
 	private final Channel channel;
 
-	public Node(final BlockingQueue<Signal> signals, final Channel channel) {
+	public Node(final Set<Signal> signals, final Channel channel,
+			final Set<Signal> toDistributeSignals) {
 		super();
 		this.signals = signals;
 		this.channel = channel;
+		this.toDistributeSignals = toDistributeSignals;
 	}
 
 	@Override
@@ -59,8 +63,14 @@ public class Node implements JGroupNode {
 		return lastView;
 	}
 
-	public BlockingQueue<Signal> getSignals() {
+	@Override
+	public Set<Signal> getLocalSignals() {
 		return signals;
+	}
+
+	@Override
+	public Set<Signal> getToDistributeSignals() {
+		return toDistributeSignals;
 	}
 
 	public void setDegraded(final boolean b) {

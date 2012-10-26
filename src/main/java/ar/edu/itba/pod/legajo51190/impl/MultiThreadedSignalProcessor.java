@@ -2,8 +2,11 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -22,7 +25,10 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
-	private final BlockingQueue<Signal> signals = new LinkedBlockingQueue<>();
+	private final Set<Signal> signals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+	private final Set<Signal> toDistributeSignals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final ListeningExecutorService localProcessingService;
 	private final int threads;
 	private final JChannel channel;
@@ -34,7 +40,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
 		channel = new JChannel();
-		node = new Node(signals, channel);
+		node = new Node(signals, channel, toDistributeSignals);
 		networkState = new NodeReceiver(node);
 
 		if (networkState != null) {
@@ -55,6 +61,8 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 	@Override
 	public void exit() throws RemoteException {
 		signals.clear();
+		toDistributeSignals.clear();
+		channel.close();
 	}
 
 	@Override
@@ -64,8 +72,8 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public void add(final Signal signal) throws RemoteException {
-		synchronized (signals) {
-			signals.add(signal);
+		synchronized (toDistributeSignals) {
+			toDistributeSignals.add(signal);
 		}
 	}
 
@@ -80,8 +88,11 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
 
-		synchronized (signals) {
-			querySignals.addAll(signals);
+		synchronized (toDistributeSignals) {
+			synchronized (signals) {
+				querySignals.addAll(toDistributeSignals);
+				querySignals.addAll(signals);
+			}
 		}
 
 		List<LocalSearchCall> queries = new ArrayList<>();

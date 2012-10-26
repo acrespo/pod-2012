@@ -2,10 +2,11 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -45,56 +46,35 @@ public class NodeUpdateService {
 		};
 
 		dataUpdateTimer = new Timer();
-		// dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
-		// @Override
-		// public void run() {
-		//
-		// if (timerEnabled.get() && node.getChannel().isConnected()
-		// && node.getAliveNodes().size() > 1) {
-		// int k = 5000;
-		// int localSignalCount = node.getSignals().size();
-		// final int amountToDistributePerNode = (int) Math
-		// .ceil(new Double(localSignalCount)
-		// / node.getAliveNodes().size());
-		// int amountOfNodesToTakeFromQueue = amountToDistributePerNode
-		// * (node.getAliveNodes().size() - 1);
-		// final List<Signal> signalsCopy = new ArrayList<>();
-		// synchronized (node.getSignals()) {
-		// Iterator<Signal> it = node.getSignals().iterator();
-		// int sigsSize = node.getSignals().size();
-		// for (int i = 0; i < k
-		// && i < sigsSize - amountOfNodesToTakeFromQueue; i++) {
-		// signalsCopy.add(it.next());
-		// }
-		// }
-		//
-		// System.out.println("-----");
-		// System.out.println(amountOfNodesToTakeFromQueue);
-		// System.out.println(amountToDistributePerNode);
-		// System.out.println(signalsCopy.size());
-		// synchronized (dataUpdateTimer) {
-		// if (signalsCopy.size() > 0 && timerEnabled.get()) {
-		// changeRequestService.submit(new Runnable() {
-		// @Override
-		// public void run() {
-		// try {
-		// System.out.println("Sending messages");
-		// Set<Address> addresses = new HashSet<Address>(
-		// node.getAliveNodes());
-		// addresses.remove(node.getAddress());
-		// sendSignalsToMembers(addresses,
-		// amountToDistributePerNode,
-		// signalsCopy);
-		// } catch (Exception e) {
-		// e.printStackTrace();
-		// }
-		// }
-		// });
-		// }
-		// }
-		// }
-		// }
-		// }, 0, 1000);
+		dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
+			@Override
+			public void run() {
+
+				if (timerEnabled.get() && node.getChannel().isConnected()
+						&& node.getAliveNodes().size() > 1) {
+					final Set<Signal> signalsCopy = new HashSet<>();
+
+					synchronized (node.getToDistributeSignals()) {
+						signalsCopy.addAll(node.getToDistributeSignals());
+						if (node.getToDistributeSignals().size() > 0) {
+							synchronized (node) {
+
+								Set<Address> allMembersButMyself = new HashSet<>(
+										node.getAliveNodes());
+
+								allMembersButMyself.remove(node.getAddress());
+
+								syncNewMembers(
+										allMembersButMyself,
+										new ArrayList<Address>(node
+												.getAliveNodes()), signalsCopy);
+								node.getToDistributeSignals().clear();
+							}
+						}
+					}
+				}
+			}
+		}, 0, 1000);
 	}
 
 	public void updateFromView(final View new_view) {
@@ -104,59 +84,50 @@ public class NodeUpdateService {
 				Set<Address> newMembers = detectNewMembers(new_view);
 				Set<Address> goneMembers = detectGoneMembers(new_view);
 
-				synchronized (dataUpdateTimer) {
-					timerEnabled.set(false);
-					syncGoneMembers(goneMembers);
-					try {
-						syncNewMembers(newMembers, new_view.getMembers());
-					} catch (Exception e) {
-						e.printStackTrace();
+				synchronized (node) {
+					if (goneMembers.size() > 0) {
+						syncGoneMembers(goneMembers);
 					}
-				}
+					if (newMembers.size() > 0) {
 
-				node.setNodeView(new_view);
+						Set<Signal> signalsCopy = null;
+						synchronized (node.getLocalSignals()) {
+							signalsCopy = new HashSet<>(node.getLocalSignals());
+						}
+
+						syncNewMembers(newMembers, new_view.getMembers(),
+								signalsCopy);
+					}
+					node.setNodeView(new_view);
+				}
 			}
 
 		});
 	}
 
 	private void syncNewMembers(final Set<Address> newMembers,
-			final List<Address> allMembers) {
+			final List<Address> allMembers, final Set<Signal> signalsCopy) {
 
-		List<Signal> signalsCopy = null;
-		synchronized (node.getSignals()) {
-			signalsCopy = new ArrayList<>(node.getSignals());
-		}
+		Random r = new Random();
 
-		int localSignalCount = signalsCopy.size();
-		int amountToDistributePerNode = (int) Math.ceil(new Double(
-				localSignalCount) / allMembers.size());
-		int amountOfNodes = newMembers.size();
-		int amountOfNodesToTakeFromQueue = amountToDistributePerNode
-				* amountOfNodes;
-
-		List<Signal> signalsTaken = new ArrayList<Signal>();
-		Iterator<Signal> it = signalsCopy.iterator();
-
-		for (int i = 0; i < amountOfNodesToTakeFromQueue; i++) {
-			signalsTaken.add(it.next());
-		}
-
-		sendSignalsToMembers(newMembers, amountToDistributePerNode,
-				signalsTaken);
-
-	}
-
-	private void sendSignalsToMembers(final Set<Address> newMembers,
-			final int amountToDistributePerNode, final List<Signal> signalsTaken) {
 		Multimap<Address, Signal> signalsToSend = HashMultimap.create();
+		Set<Signal> signalsToKeep = new HashSet<>();
 
-		int c = 0;
-		for (Address address : newMembers) {
-			for (int i = 0; i < amountToDistributePerNode; i++) {
-				signalsToSend.put(address, signalsTaken.get(c++));
+		for (Signal signal : signalsCopy) {
+			int index = r.nextInt(allMembers.size());
+			Address addressToSendData = allMembers.get(index);
+			if (newMembers.contains(addressToSendData)) {
+				signalsToSend.put(addressToSendData, signal);
+			} else {
+				signalsToKeep.add(signal);
 			}
 		}
+
+		sendSignalsToMembers(signalsToKeep, signalsToSend);
+	}
+
+	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
+			final Multimap<Address, Signal> signalsToSend) {
 
 		latch = new CountDownLatch(signalsToSend.keySet().size());
 
@@ -180,15 +151,16 @@ public class NodeUpdateService {
 			e.printStackTrace();
 		}
 
-		synchronized (node.getSignals()) {
-			for (Signal sign : signalsTaken) {
-				node.getSignals().remove(sign);
+		synchronized (node.getLocalSignals()) {
+			for (Address addr : signalsToSend.keySet()) {
+				node.getLocalSignals().removeAll(signalsToSend.get(addr));
 			}
+			node.getLocalSignals().addAll(signalsToKeep);
 			// syncGoneMembers(new HashSet<Address>(waitingAddresses));
 		}
 
-		System.out.println("Now I have " + node.getSignals().size()
-				+ " signals");
+		System.out.println("Now only " + node.getLocalSignals().size()
+				+ " signals remain");
 	}
 
 	private void syncGoneMembers(final Set<Address> goneMembers) {
@@ -196,9 +168,12 @@ public class NodeUpdateService {
 			System.out
 					.println("More than one member is gone, we might have lost messages :(");
 		}
-		synchronized (node.getSignals()) {
+		synchronized (node.getLocalSignals()) {
 			for (Address address : goneMembers) {
-				node.getSignals().addAll(signalsKeptAsBackup.get(address));
+				System.out.println("Recovering backups from "
+						+ address.toString() + " size: "
+						+ signalsKeptAsBackup.get(address).size());
+				node.getLocalSignals().addAll(signalsKeptAsBackup.get(address));
 			}
 		}
 	}
