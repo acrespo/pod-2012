@@ -25,8 +25,6 @@ import com.google.common.collect.Multimap;
 
 public class NodeUpdateService {
 
-	private final Multimap<Address, Signal> signalsKeptAsBackup = HashMultimap
-			.create();
 	private final BlockingQueue<Address> waitingAddresses = new LinkedBlockingQueue<>();
 	private final ThreadPoolExecutor changeRequestService;
 	private final Node node;
@@ -131,17 +129,20 @@ public class NodeUpdateService {
 
 		latch = new CountDownLatch(signalsToSend.keySet().size());
 
-		for (Address addr : signalsToSend.keySet()) {
-			try {
-				Message msg = new Message(addr, new NodeMessage(
-						new ArrayList<Signal>(signalsToSend.get(addr)),
-						NodeMessage.MESSAGE_NEW_NODE_SYNC));
-				signalsKeptAsBackup.putAll(addr, signalsToSend.get(addr));
-				waitingAddresses.add(addr);
-				node.getChannel().send(msg);
-			} catch (Exception e) {
-				e.printStackTrace();
+		try {
+			Message msg = new Message(null, new GlobalSyncNodeMessage(
+					signalsToSend));
+			for (Address addr : signalsToSend.keySet()) {
+				if (!addr.equals(node.getAddress())) {
+					node.getSignalsKeptAsBackup().putAll(addr,
+							signalsToSend.get(addr));
+					waitingAddresses.add(addr);
+				}
 			}
+
+			node.getChannel().send(msg);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
 		try {
@@ -172,8 +173,10 @@ public class NodeUpdateService {
 			for (Address address : goneMembers) {
 				System.out.println("Recovering backups from "
 						+ address.toString() + " size: "
-						+ signalsKeptAsBackup.get(address).size());
-				node.getLocalSignals().addAll(signalsKeptAsBackup.get(address));
+						+ node.getSignalsKeptAsBackup().get(address).size());
+				node.getLocalSignals().addAll(
+						node.getSignalsKeptAsBackup().get(address));
+				node.getSignalsKeptAsBackup().removeAll(address);
 			}
 		}
 	}
@@ -202,8 +205,8 @@ public class NodeUpdateService {
 		return newMembers;
 	}
 
-	public void notifyNodeAnswer(final NodeMessage message) {
-		waitingAddresses.remove(message.getContent());
+	public void notifyNodeAnswer(final GlobalSyncNodeMessageAnswer message) {
+		waitingAddresses.remove(message.getOwner());
 		latch.countDown();
 	}
 }

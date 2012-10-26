@@ -1,7 +1,5 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
-import java.io.Serializable;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +12,8 @@ import org.jgroups.Message;
 import org.jgroups.View;
 
 import ar.edu.itba.pod.api.Signal;
+
+import com.google.common.collect.Multimap;
 
 public class NodeReceiver extends BaseJGroupNodeReceiver {
 
@@ -41,37 +41,29 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 	@Override
 	public void receive(final Message msg) {
-		NodeMessage message = (NodeMessage) msg.getObject();
-		switch (message.getType()) {
-		case NodeMessage.MESSAGE_NEW_NODE_SYNC:
-			System.out.println("Received new node sync message");
-			onNewNodeSync(msg, message);
-			break;
-		case NodeMessage.MESSAGE_NEW_NODE_SYNC_ANSWER:
-			System.out.println("Received new node sync message answer");
-			onNewNodeSyncAnswer(message);
-			break;
-		default:
-			System.out.println("Unknown message received!");
-			break;
+
+		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
+			onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
+		} else if (msg.getObject() instanceof GlobalSyncNodeMessageAnswer) {
+			onNewNodeSyncAnswer((GlobalSyncNodeMessageAnswer) msg.getObject());
 		}
 	}
 
-	private void onNewNodeSyncAnswer(final NodeMessage message) {
+	private void onNewNodeSyncAnswer(final GlobalSyncNodeMessageAnswer message) {
 		updateService.notifyNodeAnswer(message);
 	}
 
 	@SuppressWarnings("unchecked")
-	private void onNewNodeSync(final Message msg, final NodeMessage message) {
-		List<Signal> signals = (List<Signal>) message.getContent();
+	private void onNewNodeSync(final Message msg,
+			final GlobalSyncNodeMessage message) {
+		Multimap<Address, Signal> signals = message.getSignalsMap();
 		synchronized (node.getLocalSignals()) {
-			node.getLocalSignals().addAll(signals);
+			node.getLocalSignals().addAll(signals.get(node.getAddress()));
 		}
 
 		System.out.println("I got " + signals.size() + " signals");
 		final Message reply = msg.makeReply();
-		reply.setObject(new NodeMessage((Serializable) node.getAddress(),
-				NodeMessage.MESSAGE_NEW_NODE_SYNC_ANSWER));
+		reply.setObject(new GlobalSyncNodeMessageAnswer(node.getAddress()));
 		sendSafeAnswer(reply);
 
 		System.out.println("Now I have " + node.getLocalSignals().size());

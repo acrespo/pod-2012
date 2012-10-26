@@ -14,8 +14,12 @@ import ar.edu.itba.pod.api.Signal;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 
 public class Node implements JGroupNode {
+	private final Multimap<Address, Signal> signalsKeptAsBackup;
 	private ConcurrentSkipListSet<Address> aliveNodes;
 	private ConcurrentSkipListSet<String> aliveNodeNames;
 	private View lastView;
@@ -32,6 +36,8 @@ public class Node implements JGroupNode {
 		this.signals = signals;
 		this.channel = channel;
 		this.toDistributeSignals = toDistributeSignals;
+		Multimap<Address, Signal> sig = HashMultimap.create();
+		signalsKeptAsBackup = Multimaps.synchronizedMultimap(sig);
 	}
 
 	@Override
@@ -92,5 +98,9 @@ public class Node implements JGroupNode {
 							}
 						}));
 		lastView = view;
+	}
+
+	public Multimap<Address, Signal> getSignalsKeptAsBackup() {
+		return signalsKeptAsBackup;
 	}
 }
