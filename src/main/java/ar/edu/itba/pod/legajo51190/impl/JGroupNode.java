@@ -7,7 +7,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.jgroups.Address;
 import org.jgroups.View;
 
+import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Signal;
+
+import com.google.common.collect.Multimap;
 
 public interface JGroupNode {
 
@@ -24,4 +27,9 @@ public interface JGroupNode {
 	public Set<Signal> getLocalSignals();
 
 	public Set<Signal> getToDistributeSignals();
+
+	public Multimap<Address, Signal> getBackupSignals();
+
+	public NodeStats getStats();
+
 }

@@ -10,6 +10,7 @@ import org.jgroups.Address;
 import org.jgroups.Channel;
 import org.jgroups.View;
 
+import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Signal;
 
 import com.google.common.base.Function;
@@ -19,7 +20,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
 public class Node implements JGroupNode {
-	private final Multimap<Address, Signal> signalsKeptAsBackup;
+	private final Multimap<Address, Signal> backupSignals;
 	private ConcurrentSkipListSet<Address> aliveNodes;
 	private ConcurrentSkipListSet<String> aliveNodeNames;
 	private View lastView;
@@ -37,7 +38,7 @@ public class Node implements JGroupNode {
 		this.channel = channel;
 		this.toDistributeSignals = toDistributeSignals;
 		Multimap<Address, Signal> sig = HashMultimap.create();
-		signalsKeptAsBackup = Multimaps.synchronizedMultimap(sig);
+		backupSignals = Multimaps.synchronizedMultimap(sig);
 	}
 
 	@Override
@@ -100,7 +101,15 @@ public class Node implements JGroupNode {
 		lastView = view;
 	}
 
-	public Multimap<Address, Signal> getSignalsKeptAsBackup() {
-		return signalsKeptAsBackup;
+	@Override
+	public Multimap<Address, Signal> getBackupSignals() {
+		return backupSignals;
+	}
+
+	@Override
+	public NodeStats getStats() {
+		// TODO: Improve nodestats implementation
+		return new NodeStats(getAddress().toString(), 0, signals.size(),
+				backupSignals.size(), false);
 	}
 }

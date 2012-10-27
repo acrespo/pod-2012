@@ -1,5 +1,6 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
+import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -25,7 +26,7 @@ public abstract class AbstractDistributedNodeTest {
 
 	private final CountdownSyncListener listener = new CountdownSyncListener();
 
-	private final LinkedList<SignalNode> nodesToTest = new LinkedList<>();
+	private static final LinkedList<SignalNode> nodesToTest = new LinkedList<>();
 
 	private RandomSource src;
 
@@ -68,11 +69,17 @@ public abstract class AbstractDistributedNodeTest {
 				throw new RuntimeException("Something didn't sync right");
 			}
 		}
+		System.out.println("==================");
+		System.out.println("ALL MEMBERS GONE!");
 	}
 
 	/**
-	 * Must start the processors in background and connect all of them to the
-	 * same channel, blocking until it's done.
+	 * Must be called at the beggining of a test. Must start the processors in
+	 * background and connect all of them to the same channel, blocking until
+	 * it's done.
+	 * 
+	 * @param size
+	 *            Amount of nodes to start with
 	 */
 	private void instanciateNodes(final int size) {
 
@@ -83,6 +90,15 @@ public abstract class AbstractDistributedNodeTest {
 		addNewNodes(size);
 	}
 
+	/**
+	 * Joins a set of nodes to the testChannel, awaiting if it's blocking a
+	 * blocking implementation or synchronizing if it's not
+	 * 
+	 * @param nodes
+	 *            Nodes to add to the channel
+	 * @param controlLatch
+	 *            Latch for controlling the synchronization
+	 */
 	private void joinNodesToChannel(final Set<SignalNode> nodes,
 			final CountDownLatch controlLatch) {
 
@@ -92,7 +108,8 @@ public abstract class AbstractDistributedNodeTest {
 
 		for (SignalNode node : nodes) {
 			try {
-				isBlocking = node.getInjectedListener() == null;
+				isBlocking = node.getInjectedListener() == null
+						&& node.getInjectedListener() == listener;
 				node.join("testChannel");
 			} catch (RemoteException e) {
 				e.printStackTrace();
@@ -109,6 +126,14 @@ public abstract class AbstractDistributedNodeTest {
 
 	}
 
+	/**
+	 * Adds a set of signals to a node, doesn't yet mind for synchronization
+	 * 
+	 * @param node
+	 *            Node to send signals to.
+	 * @param amountOfSignals
+	 *            Amount of random signals to add
+	 */
 	private void addSignalsToNode(final SignalNode node,
 			final int amountOfSignals) {
 		for (int i = 0; i < amountOfSignals; i++) {
@@ -120,6 +145,13 @@ public abstract class AbstractDistributedNodeTest {
 		}
 	}
 
+	/**
+	 * Add nodes to the channel. Guarantees that all nodes are joined after it
+	 * leaves.
+	 * 
+	 * @param amount
+	 *            Amount of nodes to add to the channel.
+	 */
 	private void addNewNodes(final int amount) {
 		Set<SignalNode> nodes = new HashSet<>();
 		for (int i = 0; i < amount; i++) {
@@ -134,14 +166,35 @@ public abstract class AbstractDistributedNodeTest {
 		nodesToTest.addAll(nodes);
 	}
 
+	/**
+	 * Asserts that the node has backup signals and own signals
+	 * 
+	 * @param node
+	 *            Node to analyze
+	 */
 	private void assertNodeIsNotEmpty(final SignalNode node)
 			throws RemoteException {
-
 		Assert.assertTrue(node.getStats().backupSignals() > 0);
 		Assert.assertTrue(node.getStats().storedSignals() > 0);
-
 	}
 
+	/**
+	 * Asserts that the node has backup signals and own signals
+	 * 
+	 * @param node
+	 *            Node to analyze
+	 */
+	private void assertNodeStoreIsNotEmpty(final SignalNode node)
+			throws RemoteException {
+		Assert.assertTrue(node.getStats().storedSignals() > 0);
+	}
+
+	/**
+	 * Test that the total amount of stored elements is the given size.
+	 * 
+	 * @param stored
+	 * @throws RemoteException
+	 */
 	private void assertTotalAmountIs(final int stored) throws RemoteException {
 
 		int sumStored = 0;
@@ -152,20 +205,26 @@ public abstract class AbstractDistributedNodeTest {
 			sumBackuped += node.getStats().backupSignals();
 		}
 
-		Assert.assertEquals(sumStored, stored);
-		Assert.assertEquals(sumBackuped, stored);
+		Assert.assertEquals(stored, sumStored);
+		Assert.assertEquals(stored, sumBackuped);
 
 	}
 
+	/**
+	 * One node joins a channel with one node.
+	 * 
+	 * @throws IOException
+	 */
 	@Test
 	public void synchronizeOnNewMember() throws InterruptedException,
-			RemoteException {
+			IOException {
+
+		// Initial group size: 1 member
 		instanciateNodes(1);
 
+		// We add nodes to the first member and await it to
 		SignalNode first = nodesToTest.getFirst();
-
-		addSignalsToNode(first, 1000);
-
+		addSignalsToNode(first, 1500);
 		Thread.sleep(2000);
 
 		addNewNodes(1);
@@ -174,6 +233,52 @@ public abstract class AbstractDistributedNodeTest {
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.getLast());
+		assertTotalAmountIs(1500);
+	}
+
+	/**
+	 * Two nodes join a channel with one node.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeOnTwoNewMembers() throws InterruptedException,
+			IOException {
+
+		// Initial group size: 1 member
+		instanciateNodes(1);
+
+		// We add nodes to the first member and await it to
+		SignalNode first = nodesToTest.getFirst();
+		addSignalsToNode(first, 1000);
+		Thread.sleep(2000);
+
+		addNewNodes(2);
+
+		Thread.sleep(2000); // Time to sync TODO: Make this synchronizable
+
+		assertNodeStoreIsNotEmpty(nodesToTest.getFirst());
+		assertNodeStoreIsNotEmpty(nodesToTest.get(1));
+		assertNodeStoreIsNotEmpty(nodesToTest.getLast());
 		assertTotalAmountIs(1000);
+	}
+
+	/**
+	 * 5 nodes join a channel with one node.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeOnSecondNewMember() throws InterruptedException,
+			IOException {
+		synchronizeOnNewMember();
+		addNewNodes(1);
+
+		Thread.sleep(3000); // Time to sync TODO: Make this synchronizable
+
+		assertNodeIsNotEmpty(nodesToTest.getFirst());
+		assertNodeIsNotEmpty(nodesToTest.get(1));
+		assertNodeIsNotEmpty(nodesToTest.getLast());
+		assertTotalAmountIs(1500);
 	}
 }

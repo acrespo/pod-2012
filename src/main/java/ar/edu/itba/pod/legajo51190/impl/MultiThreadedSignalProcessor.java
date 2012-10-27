@@ -35,6 +35,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 	private final JChannel channel;
 	private final NodeReceiver networkState;
 	private final Node node;
+	private final NodeLogger nodeLogger;
 
 	public MultiThreadedSignalProcessor(final int threads) throws Exception {
 		this(threads, null);
@@ -48,6 +49,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		channel = new JChannel();
 		node = new Node(signals, channel, toDistributeSignals);
 		networkState = new NodeReceiver(node);
+		channel.setDiscardOwnMessages(true);
 
 		if (networkState != null) {
 			channel.setReceiver(networkState);
@@ -59,6 +61,8 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 				channel.addChannelListener(channelListener);
 			}
 		}
+
+		nodeLogger = new NodeLogger(node);
 	}
 
 	@Override
@@ -79,7 +83,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
-		throw new RemoteException("Not yet implemented :D");
+		return node.getStats();
 	}
 
 	@Override
