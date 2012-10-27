@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.jgroups.ChannelListener;
 import org.jgroups.JChannel;
 
 import ar.edu.itba.pod.api.NodeStats;
@@ -36,6 +37,11 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 	private final Node node;
 
 	public MultiThreadedSignalProcessor(final int threads) throws Exception {
+		this(threads, null);
+	}
+
+	public MultiThreadedSignalProcessor(final int threads,
+			final Set<ChannelListener> listeners) throws Exception {
 		this.threads = threads;
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
@@ -46,6 +52,12 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		if (networkState != null) {
 			channel.setReceiver(networkState);
 			channel.addChannelListener(networkState);
+		}
+
+		if (listeners != null) {
+			for (ChannelListener channelListener : listeners) {
+				channel.addChannelListener(channelListener);
+			}
 		}
 	}
 

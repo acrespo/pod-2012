@@ -53,7 +53,6 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		updateService.notifyNodeAnswer(message);
 	}
 
-	@SuppressWarnings("unchecked")
 	private void onNewNodeSync(final Message msg,
 			final GlobalSyncNodeMessage message) {
 		Multimap<Address, Signal> signals = message.getSignalsMap();
