@@ -60,34 +60,34 @@ public class NodeUpdateService {
 
 						synchronized (node.getToDistributeSignals()) {
 							signalsCopy.addAll(node.getToDistributeSignals());
-							if (node.getToDistributeSignals().size() > 0) {
+							node.getToDistributeSignals().clear();
+						}
+						if (signalsCopy.size() > 0) {
 
-								Set<Address> allMembersButMyself = new HashSet<>(
-										node.getAliveNodes());
+							Set<Address> allMembersButMyself = new HashSet<>(
+									node.getAliveNodes());
 
-								allMembersButMyself.remove(node.getAddress());
+							allMembersButMyself.remove(node.getAddress());
 
-								Multimap<Address, Signal> copyOfBackupSignals = null;
+							Multimap<Address, Signal> copyOfBackupSignals = null;
 
-								synchronized (node.getBackupSignals()) {
-									copyOfBackupSignals = HashMultimap
-											.create(node.getBackupSignals());
-								}
-
-								nodeLogger.log("Updating my new nodes...");
-								syncNewMembers(
-										Lists.newArrayList(allMembersButMyself),
-										Lists.newArrayList(node.getAliveNodes()),
-										signalsCopy, copyOfBackupSignals);
-								node.getToDistributeSignals().clear();
-
-								nodeLogger.log("Updated!");
-								if (node.getListener() != null) {
-									node.getListener().onNodeSyncDone();
-								}
+							synchronized (node.getBackupSignals()) {
+								copyOfBackupSignals = HashMultimap.create(node
+										.getBackupSignals());
 							}
 
+							nodeLogger.log("Updating my new nodes...");
+							syncNewMembers(
+									Lists.newArrayList(allMembersButMyself),
+									Lists.newArrayList(node.getAliveNodes()),
+									signalsCopy, copyOfBackupSignals);
+
+							nodeLogger.log("Updated!");
+							if (node.getListener() != null) {
+								node.getListener().onNodeSyncDone();
+							}
 						}
+
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
