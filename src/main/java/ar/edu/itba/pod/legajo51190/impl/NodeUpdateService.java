@@ -53,7 +53,8 @@ public class NodeUpdateService {
 
 				try {
 
-					if (timerEnabled.get() && node.getChannel().isConnected()
+					if (timerEnabled.get() && node.getChannel() != null
+							&& node.getChannel().isConnected()
 							&& node.getAliveNodes().size() > 1) {
 						final Set<Signal> signalsCopy = new HashSet<>();
 
@@ -66,12 +67,18 @@ public class NodeUpdateService {
 
 								allMembersButMyself.remove(node.getAddress());
 
+								Multimap<Address, Signal> copyOfBackupSignals = null;
+
+								synchronized (node.getBackupSignals()) {
+									copyOfBackupSignals = HashMultimap
+											.create(node.getBackupSignals());
+								}
+
 								nodeLogger.log("Updating my new nodes...");
 								syncNewMembers(
 										Lists.newArrayList(allMembersButMyself),
 										Lists.newArrayList(node.getAliveNodes()),
-										signalsCopy, HashMultimap.create(node
-												.getBackupSignals()));
+										signalsCopy, copyOfBackupSignals);
 								node.getToDistributeSignals().clear();
 
 								nodeLogger.log("Updated!");
@@ -112,12 +119,17 @@ public class NodeUpdateService {
 										.getLocalSignals());
 							}
 
+							Multimap<Address, Signal> copyOfBackupSignals = null;
+
+							synchronized (node.getBackupSignals()) {
+								copyOfBackupSignals = HashMultimap.create(node
+										.getBackupSignals());
+							}
+
 							// nodeLogger.log("New node! Sending data...");
-							syncNewMembers(
-									Lists.newArrayList(newMembers),
-									new_view.getMembers(),
-									signalsCopy,
-									HashMultimap.create(node.getBackupSignals()));
+							syncNewMembers(Lists.newArrayList(newMembers),
+									new_view.getMembers(), signalsCopy,
+									copyOfBackupSignals);
 
 							nodeLogger.log("Updated!");
 							if (node.getListener() != null) {

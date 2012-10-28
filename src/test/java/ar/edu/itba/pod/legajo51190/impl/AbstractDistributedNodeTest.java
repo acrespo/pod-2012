@@ -89,6 +89,14 @@ public abstract class AbstractDistributedNodeTest {
 
 		nodesToTest.clear();
 
+		try {
+			// Even though it syncs, sometimes when a new channel is built the
+			// views don't start empty, so we wait 5 seconds here.
+			Thread.sleep(5000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
 		addNewNodes(size);
 	}
 
