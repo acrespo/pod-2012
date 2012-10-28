@@ -202,10 +202,14 @@ public abstract class AbstractDistributedNodeTest {
 
 		for (SignalNode node : nodesToTest) {
 			System.out.println(node.getStats().nodeId() + " stored signals: "
-					+ node.getStats().storedSignals());
+					+ node.getStats().storedSignals() + " backup signaks:"
+					+ node.getStats().backupSignals());
 			sumStored += node.getStats().storedSignals();
 			sumBackuped += node.getStats().backupSignals();
 		}
+
+		System.out.println("Total stored: " + sumStored);
+		System.out.println("Total stored: " + sumBackuped);
 
 		Assert.assertEquals(stored, sumStored);
 		Assert.assertEquals(stored, sumBackuped);
