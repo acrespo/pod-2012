@@ -89,13 +89,13 @@ public abstract class AbstractDistributedNodeTest {
 
 		nodesToTest.clear();
 
-		try {
-			// Even though it syncs, sometimes when a new channel is built the
-			// views don't start empty, so we wait 5 seconds here.
-			Thread.sleep(5000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+		// try {
+		// // Even though it syncs, sometimes when a new channel is built the
+		// // views don't start empty, so we wait 5 seconds here.
+		// // Thread.sleep(5000);
+		// } catch (InterruptedException e) {
+		// e.printStackTrace();
+		// }
 
 		addNewNodes(size);
 	}
@@ -168,6 +168,19 @@ public abstract class AbstractDistributedNodeTest {
 			} catch (RemoteException e) {
 				e.printStackTrace();
 			}
+		}
+
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
+				1 * nodesToTest.size());
+
+		listener.setNewNodeLatch(newNodeAwaitLatch);
+
+		try {
+			if (!newNodeAwaitLatch.await(15, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
+			}
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Something didn't sync right");
 		}
 	}
 
@@ -279,7 +292,6 @@ public abstract class AbstractDistributedNodeTest {
 		SignalNode first = nodesToTest.getFirst();
 
 		addSignalsToNode(first, 2400);
-		Thread.sleep(2000);
 
 		addNewNodes(1);
 
@@ -304,8 +316,6 @@ public abstract class AbstractDistributedNodeTest {
 		SignalNode first = nodesToTest.getFirst();
 
 		addSignalsToNode(first, 1000);
-
-		Thread.sleep(2000);
 
 		addNewNodes(2);
 

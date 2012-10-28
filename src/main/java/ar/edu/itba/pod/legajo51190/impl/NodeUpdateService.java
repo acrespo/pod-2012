@@ -54,8 +54,7 @@ public class NodeUpdateService {
 				try {
 
 					if (timerEnabled.get() && node.getChannel() != null
-							&& node.getChannel().isConnected()
-							&& node.getAliveNodes().size() > 1) {
+							&& node.getChannel().isConnected()) {
 						final Set<Signal> signalsCopy = new HashSet<>();
 
 						synchronized (node.getToDistributeSignals()) {
@@ -77,13 +76,16 @@ public class NodeUpdateService {
 							}
 
 							nodeLogger.log("Updating my new nodes...");
-							syncNewMembers(
-									Lists.newArrayList(allMembersButMyself),
-									Lists.newArrayList(node.getAliveNodes()),
-									signalsCopy, copyOfBackupSignals);
 
-							nodeLogger.log("Updated!");
-							if (node.getListener() != null) {
+							synchronized (node) {
+								syncNewMembers(
+										Lists.newArrayList(allMembersButMyself),
+										Lists.newArrayList(node.getAliveNodes()),
+										signalsCopy, copyOfBackupSignals);
+							}
+
+							if (node.getToDistributeSignals().isEmpty()
+									&& node.getListener() != null) {
 								node.getListener().onNodeSyncDone();
 							}
 						}
@@ -126,10 +128,11 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							// nodeLogger.log("New node! Sending data...");
-							syncNewMembers(Lists.newArrayList(newMembers),
-									new_view.getMembers(), signalsCopy,
-									copyOfBackupSignals);
+							synchronized (node) {
+								syncNewMembers(Lists.newArrayList(newMembers),
+										new_view.getMembers(), signalsCopy,
+										copyOfBackupSignals);
+							}
 
 							nodeLogger.log("Updated!");
 							if (node.getListener() != null) {
@@ -174,10 +177,12 @@ public class NodeUpdateService {
 		boolean copyMode = allMembers.size() - newMembers.size() == 1;
 
 		if (copyMode) {
-			for (Signal signal : signalsToKeep) {
-				Address addressToSendData = getAddressForSignal(signal,
-						allMembersButMe, allMembers);
-				backupSignalsToSend.put(addressToSendData, signal);
+			if (allMembers.size() > 1) {
+				for (Signal signal : signalsToKeep) {
+					Address addressToSendData = getAddressForSignal(signal,
+							allMembersButMe, allMembers);
+					backupSignalsToSend.put(addressToSendData, signal);
+				}
 			}
 		} else {
 			List<Address> newMembersAndMe = new ArrayList<>(newMembers);
