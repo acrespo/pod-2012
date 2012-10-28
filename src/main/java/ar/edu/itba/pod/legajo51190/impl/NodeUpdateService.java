@@ -173,9 +173,9 @@ public class NodeUpdateService {
 						backupSignalsToSend.put(backupAddr, sign);
 					}
 				}
-				nodeLogger.log("Sending: "
-						+ backupSignalsToSend.get(backupAddr).size()
-						+ " nodes from " + backupAddr);
+				// nodeLogger.log("Sending: "
+				// + backupSignalsToSend.get(backupAddr).size()
+				// + " nodes from " + backupAddr);
 			}
 		}
 
