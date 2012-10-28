@@ -5,8 +5,6 @@ import java.util.Set;
 
 import org.jgroups.ChannelListener;
 
-import ar.edu.itba.pod.legajo51190.api.CompositeTestableSignalNode;
-import ar.edu.itba.pod.legajo51190.api.SignalNode;
 
 public class MyDistributedNodeTest extends AbstractDistributedNodeTest {
 

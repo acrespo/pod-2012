@@ -14,7 +14,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import ar.edu.itba.pod.legajo51190.api.SignalNode;
 import ar.edu.itba.pod.signal.source.RandomSource;
 
 /**

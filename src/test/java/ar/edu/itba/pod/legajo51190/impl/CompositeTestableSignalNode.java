@@ -1,4 +1,4 @@
-package ar.edu.itba.pod.legajo51190.api;
+package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 
@@ -7,7 +7,6 @@ import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
-import ar.edu.itba.pod.legajo51190.impl.CountdownSyncListener;
 
 /**
  * SignalNode implementation for testing a SPNode and SignalProcessor Requires
