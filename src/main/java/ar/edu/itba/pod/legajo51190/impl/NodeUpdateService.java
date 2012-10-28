@@ -3,7 +3,6 @@ package ar.edu.itba.pod.legajo51190.impl;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -46,7 +45,6 @@ public class NodeUpdateService {
 		};
 
 		nodeLogger = new NodeLogger(node);
-		nodeLogger.setEnabled(false);
 
 		dataUpdateTimer = new Timer();
 		dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
@@ -72,7 +70,8 @@ public class NodeUpdateService {
 								syncNewMembers(
 										Lists.newArrayList(allMembersButMyself),
 										Lists.newArrayList(node.getAliveNodes()),
-										signalsCopy);
+										signalsCopy, HashMultimap.create(node
+												.getBackupSignals()));
 								node.getToDistributeSignals().clear();
 							}
 
@@ -108,9 +107,12 @@ public class NodeUpdateService {
 										.getLocalSignals());
 							}
 
-							nodeLogger.log("New node! Sending data...");
-							syncNewMembers(Lists.newArrayList(newMembers),
-									new_view.getMembers(), signalsCopy);
+							// nodeLogger.log("New node! Sending data...");
+							syncNewMembers(
+									Lists.newArrayList(newMembers),
+									new_view.getMembers(),
+									signalsCopy,
+									HashMultimap.create(node.getBackupSignals()));
 						}
 
 					}
@@ -125,9 +127,8 @@ public class NodeUpdateService {
 	}
 
 	private void syncNewMembers(final List<Address> newMembers,
-			final List<Address> allMembers, final Set<Signal> signalsCopy) {
-
-		Random r = new Random();
+			final List<Address> allMembers, final Set<Signal> signalsCopy,
+			final Multimap<Address, Signal> backupMapCopy) {
 
 		Multimap<Address, Signal> signalsToSend = HashMultimap.create();
 
@@ -159,27 +160,30 @@ public class NodeUpdateService {
 		} else {
 			List<Address> newMembersAndMe = new ArrayList<>(newMembers);
 			newMembersAndMe.add(node.getAddress());
-			synchronized (node.getBackupSignals()) {
-				for (Address backupAddr : node.getBackupSignals().keySet()) {
-					for (Signal sign : node.getBackupSignals().get(backupAddr)) {
-						Address addressToSendData = getAddressForSignal(sign,
-								allMembersButMe, allMembers);
-						if (!addressToSendData.equals(node.getAddress())
-								&& newMembersAndMe.contains(addressToSendData)) {
-							backupSignalsToSend.put(backupAddr, sign);
-						}
+			for (Address backupAddr : backupMapCopy.keySet()) {
+				for (Signal sign : backupMapCopy.get(backupAddr)) {
+					Address addressToSendData = getAddressForSignal(sign,
+							allMembersButMe, allMembers);
+					if (!addressToSendData.equals(node.getAddress())
+							&& newMembersAndMe.contains(addressToSendData)) {
+						backupSignalsToSend.put(backupAddr, sign);
 					}
-					// nodeLogger.log("Sending: "
-					// + backupSignalsToSend.get(backupAddr).size()
-					// + " nodes from " + backupAddr);
 				}
+				nodeLogger.logAcum("Sending: "
+						+ backupSignalsToSend.get(backupAddr).size()
+						+ " nodes from " + backupAddr);
 			}
+
 		}
 
-		new NodeLogger(node).log("Sending my " + signalsToSend.size());
-		nodeLogger.log("Sending: " + signalsToSend.size()
-				+ " nodes from myself");
-		nodeLogger.log("Keeping " + signalsToKeep.size() + " for myself");
+		nodeLogger.logAcum("Sending my " + signalsToSend.size());
+		nodeLogger.logAcum("Sending backups total "
+				+ backupSignalsToSend.size());
+		nodeLogger.logAcum("Keeping " + signalsToKeep.size() + " for myself");
+		nodeLogger.logAcum("I considered I had " + allMembers.size()
+				+ " members in cluster and " + newMembers.size());
+
+		nodeLogger.flush();
 
 		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
 				copyMode, allMembersButMe);
@@ -193,8 +197,11 @@ public class NodeUpdateService {
 		latch = new CountDownLatch(receptors.size());
 
 		try {
-			Message msg = new Message(null, new GlobalSyncNodeMessage(
-					signalsToSend, backupSignalsToSend, copyMode));
+			for (Address receptor : receptors) {
+				Message msg = new Message(receptor, new GlobalSyncNodeMessage(
+						signalsToSend, backupSignalsToSend, copyMode));
+				node.getChannel().send(msg);
+			}
 
 			for (Address addr : signalsToSend.keySet()) {
 				if (!addr.equals(node.getAddress())) {
@@ -205,18 +212,16 @@ public class NodeUpdateService {
 				}
 			}
 			waitingAddresses.addAll(receptors);
-			node.getChannel().send(msg);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		try {
-			new NodeLogger(node).log("Waiting with " + latch.getCount());
 			if (!latch.await(5, TimeUnit.SECONDS)) {
 				throw new Exception("JA!!!");
 			}
 		} catch (Exception e) {
-			System.out.println("SOMEONE IGNORED MY MESSAGE!!!");
 			for (Address address : waitingAddresses) {
 				System.out.println("Sending to " + address);
 				new Message(address, new GlobalSyncNodeMessage(signalsToSend,
@@ -252,8 +257,6 @@ public class NodeUpdateService {
 			}
 		}
 
-		nodeLogger.log("I have " + node.getLocalSignals().size()
-				+ " signals left");
 	}
 
 	private void syncGoneMembers(final Set<Address> goneMembers) {
@@ -291,7 +294,7 @@ public class NodeUpdateService {
 		Set<Address> newMembers = new HashSet<Address>();
 		for (Address address : new_view.getMembers()) {
 			if (!node.getLastView().containsMember(address)) {
-				nodeLogger.log("New member! hey! " + address);
+				// nodeLogger.log("New member! hey! " + address);
 				node.setDegraded(true);
 				newMembers.add(address);
 			}
@@ -299,7 +302,9 @@ public class NodeUpdateService {
 		return newMembers;
 	}
 
-	private Address getAddressForSignal(final Signal sig,
+	// private static final Random r = new Random();
+
+	Address getAddressForSignal(final Signal sig,
 			final List<Address> membersToPutIn, final List<Address> allMembers) {
 		int size = membersToPutIn.size();
 		int allMembersSize = allMembers.size();
@@ -308,8 +313,6 @@ public class NodeUpdateService {
 	}
 
 	public void notifyNodeAnswer(final GlobalSyncNodeMessageAnswer message) {
-		new NodeLogger(node).log("======== I got ANSWER from "
-				+ message.getOwner());
 		waitingAddresses.remove(message.getOwner());
 		latch.countDown();
 	}

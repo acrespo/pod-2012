@@ -6,6 +6,7 @@ public class NodeLogger {
 	private final Node node;
 	private final PrintStream stream;
 	private boolean enabled = true;
+	private StringBuilder builder = new StringBuilder();
 
 	public NodeLogger(final Node node) {
 		this(node, System.out);
@@ -14,6 +15,15 @@ public class NodeLogger {
 	public NodeLogger(final Node node, final PrintStream stream) {
 		this.stream = stream;
 		this.node = node;
+	}
+
+	public synchronized void logAcum(final String s) {
+		builder.append("[" + node.getAddress() + "]:" + s + "\n");
+	}
+
+	public synchronized void flush() {
+		stream.print(builder.toString());
+		builder = new StringBuilder();
 	}
 
 	public void log(final String s) {

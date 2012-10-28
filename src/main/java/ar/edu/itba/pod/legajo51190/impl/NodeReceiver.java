@@ -1,6 +1,7 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
-import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -15,6 +16,7 @@ import org.jgroups.View;
 import ar.edu.itba.pod.api.Signal;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class NodeReceiver extends BaseJGroupNodeReceiver {
 
@@ -109,23 +111,46 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 					// If i'm one of the original receivers of this data,
 					// Then I save my backup copies
 					for (Address addr : message.getBackupSignals().keySet()) {
-						if (!addr.equals(node.getAddress())) {
-							node.getBackupSignals().putAll(msg.getSrc(),
-									message.getBackupSignals().get(addr));
-						}
+						node.getBackupSignals().putAll(addr,
+								message.getBackupSignals().get(addr));
 					}
 				} else {
 
-					Collection<Signal> signals = Lists.newArrayList(node
+					Set<Signal> signals = Sets.newHashSet(node
 							.getBackupSignals().get(msg.getSrc()));
 
 					node.getBackupSignals().removeAll(msg.getSrc());
 
+					Set<Signal> signalsIntersection = Sets.intersection(
+							signals,
+							Sets.newHashSet(message.getSignalsMap().values()));
 					signals.removeAll(message.getSignalsMap().values());
 
+					List<Address> allThirdKindMembers = Lists.newArrayList(node
+							.getAliveNodes());
+					List<Address> allMembers = Lists.newArrayList(node
+							.getAliveNodes());
+
+					allThirdKindMembers.removeAll(message.getDestinations());
+					allThirdKindMembers.remove(msg.getSrc());
+
 					for (Address address : message.getSignalsMap().keySet()) {
-						node.getBackupSignals().putAll(address,
-								message.getSignalsMap().get(address));
+
+						for (Signal signal : message.getSignalsMap().get(
+								address)) {
+							Address owner = updateService.getAddressForSignal(
+									signal, allThirdKindMembers, allMembers);
+
+							if (owner.equals(node.getAddress())) {
+								node.getBackupSignals().put(address, signal);
+							} else {
+								nodeLogger.logAcum(owner.toString());
+							}
+
+						}
+						// node.getBackupSignals().putAll(address,
+						// message.getSignalsMap().get(address));
+
 					}
 
 					node.getBackupSignals().putAll(msg.getSrc(), signals);
@@ -154,15 +179,14 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// nodeLogger.log("I received " + node.getBackupSignals().size()
 		// + " COPY signals");
 		// } else {
-		if (!message.isCopyMode()) {
-			for (Address addr : node.getBackupSignals().keySet()) {
-				nodeLogger.log("I HAVE NOW: "
-						+ node.getBackupSignals().get(addr).size() + " FOR: "
-						+ addr);
-			}
-		}
+		// nodeLogger.logAcum("I have " + node.getLocalSignals().size()
+		// + " signals");
+		// if (!message.isCopyMode()) {
+		// nodeLogger.logAcum("I got total " + node.getBackupSignals().size()
+		// + " from " + msg.getSrc());
 		// }
-		nodeLogger.log("I got message from " + msg.getSrc());
+		nodeLogger.flush();
+		// }
 	}
 
 	private void sendSafeAnswer(final Message reply) {

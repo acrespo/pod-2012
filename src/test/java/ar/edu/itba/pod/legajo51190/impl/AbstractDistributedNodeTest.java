@@ -2,16 +2,18 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
+import org.jgroups.Address;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.signal.source.RandomSource;
@@ -200,16 +202,37 @@ public abstract class AbstractDistributedNodeTest {
 		int sumStored = 0;
 		int sumBackuped = 0;
 
+		Map<Address, Integer> localSize = new HashMap<Address, Integer>();
+		Map<Address, Integer> backupSize = new HashMap<Address, Integer>();
+
 		for (SignalNode node : nodesToTest) {
-			System.out.println(node.getStats().nodeId() + " stored signals: "
-					+ node.getStats().storedSignals() + " backup signaks:"
-					+ node.getStats().backupSignals());
 			sumStored += node.getStats().storedSignals();
 			sumBackuped += node.getStats().backupSignals();
+
+			JGroupNode jNode = node.getJGroupNode();
+
+			localSize.put(jNode.getAddress(), jNode.getLocalSignals().size());
+
+			NodeLogger logger = new NodeLogger((Node) jNode);
+
+			logger.log("=== Local data: " + jNode.getLocalSignals().size());
+
+			for (Address addr : jNode.getBackupSignals().keySet()) {
+				if (!backupSize.containsKey(addr)) {
+					backupSize.put(addr, 0);
+				}
+
+				backupSize.put(addr, backupSize.get(addr)
+						+ jNode.getBackupSignals().get(addr).size());
+
+				logger.log("=== Backup data for: " + addr + " - "
+						+ jNode.getBackupSignals().get(addr).size());
+			}
 		}
 
-		System.out.println("Total stored: " + sumStored);
-		System.out.println("Total backuped: " + sumBackuped);
+		for (Address addr : localSize.keySet()) {
+			Assert.assertEquals(localSize.get(addr), backupSize.get(addr));
+		}
 
 		Assert.assertEquals(stored, sumStored);
 		Assert.assertEquals(stored, sumBackuped);
@@ -222,7 +245,6 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	@Ignore
 	public void synchronizeOnNewMember() throws InterruptedException,
 			IOException {
 
@@ -231,7 +253,7 @@ public abstract class AbstractDistributedNodeTest {
 
 		// We add nodes to the first member and await it to
 		SignalNode first = nodesToTest.getFirst();
-		addSignalsToNode(first, 1500);
+		addSignalsToNode(first, 2400);
 		Thread.sleep(2000);
 
 		addNewNodes(1);
@@ -240,7 +262,7 @@ public abstract class AbstractDistributedNodeTest {
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.getLast());
-		assertTotalAmountIs(1500);
+		assertTotalAmountIs(2400);
 	}
 
 	/**
@@ -249,7 +271,6 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	@Ignore
 	public void synchronizeOnTwoNewMembers() throws InterruptedException,
 			IOException {
 
@@ -277,7 +298,6 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	@Ignore
 	public void synchronizeOnSecondNewMember() throws InterruptedException,
 			IOException {
 		synchronizeOnNewMember();
@@ -289,7 +309,7 @@ public abstract class AbstractDistributedNodeTest {
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));
 		assertNodeIsNotEmpty(nodesToTest.getLast());
-		assertTotalAmountIs(1500);
+		assertTotalAmountIs(2400);
 	}
 
 	/**
@@ -306,17 +326,17 @@ public abstract class AbstractDistributedNodeTest {
 
 		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
 
-		assertTotalAmountIs(1500);
+		assertTotalAmountIs(2400);
 
 		addNewNodes(1);
 
-		Thread.sleep(15000); // Time to sync TODO: Make this synchronizable
+		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));
 		assertNodeIsNotEmpty(nodesToTest.get(2));
 		assertNodeIsNotEmpty(nodesToTest.getLast());
-		assertTotalAmountIs(1500);
+		assertTotalAmountIs(2400);
 	}
 
 }

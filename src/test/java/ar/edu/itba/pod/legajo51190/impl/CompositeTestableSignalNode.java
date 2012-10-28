@@ -58,6 +58,11 @@ public class CompositeTestableSignalNode implements SignalNode {
 	}
 
 	@Override
+	public JGroupNode getJGroupNode() {
+		return ((MultiThreadedSignalProcessor) processor).getJGroupNode();
+	}
+
+	@Override
 	public CountdownSyncListener getInjectedListener() {
 		return injectedListener;
 	}

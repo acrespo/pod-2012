@@ -6,4 +6,7 @@ import ar.edu.itba.pod.api.SignalProcessor;
 public interface SignalNode extends SignalProcessor, SPNode {
 
 	CountdownSyncListener getInjectedListener();
+
+	JGroupNode getJGroupNode();
+
 }

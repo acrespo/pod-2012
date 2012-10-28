@@ -46,7 +46,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		this.threads = threads;
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
-		channel = new JChannel();
+		channel = new JChannel("udp-largecluster.xml");
 		node = new Node(signals, channel, toDistributeSignals);
 		networkState = new NodeReceiver(node);
 		channel.setDiscardOwnMessages(true);
@@ -143,4 +143,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		return result;
 	}
 
+	JGroupNode getJGroupNode() {
+		return node;
+	}
 }
