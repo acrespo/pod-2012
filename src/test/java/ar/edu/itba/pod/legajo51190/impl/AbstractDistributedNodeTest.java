@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.Assert;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.legajo51190.api.SignalNode;
@@ -201,6 +202,8 @@ public abstract class AbstractDistributedNodeTest {
 		int sumBackuped = 0;
 
 		for (SignalNode node : nodesToTest) {
+			System.out.println(node.getStats().nodeId() + " stored signals: "
+					+ node.getStats().storedSignals());
 			sumStored += node.getStats().storedSignals();
 			sumBackuped += node.getStats().backupSignals();
 		}
@@ -216,6 +219,7 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
+	@Ignore
 	public void synchronizeOnNewMember() throws InterruptedException,
 			IOException {
 
@@ -242,6 +246,7 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
+	@Ignore
 	public void synchronizeOnTwoNewMembers() throws InterruptedException,
 			IOException {
 
@@ -264,21 +269,51 @@ public abstract class AbstractDistributedNodeTest {
 	}
 
 	/**
-	 * 5 nodes join a channel with one node.
+	 * 1 node joins a channel with two nodes syncd.
 	 * 
 	 * @throws IOException
 	 */
 	@Test
+	@Ignore
 	public void synchronizeOnSecondNewMember() throws InterruptedException,
 			IOException {
 		synchronizeOnNewMember();
+
 		addNewNodes(1);
 
-		Thread.sleep(3000); // Time to sync TODO: Make this synchronizable
+		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));
 		assertNodeIsNotEmpty(nodesToTest.getLast());
 		assertTotalAmountIs(1500);
 	}
+
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeOnSecondTimeWithTwoMembers()
+			throws InterruptedException, IOException {
+		synchronizeOnNewMember();
+
+		addNewNodes(1);
+
+		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
+
+		addNewNodes(1);
+
+		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
+
+		System.in.read();
+
+		assertNodeIsNotEmpty(nodesToTest.getFirst());
+		assertNodeIsNotEmpty(nodesToTest.get(1));
+		assertNodeIsNotEmpty(nodesToTest.get(2));
+		assertNodeIsNotEmpty(nodesToTest.getLast());
+		assertTotalAmountIs(1500);
+	}
+
 }

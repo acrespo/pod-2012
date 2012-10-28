@@ -46,6 +46,7 @@ public class NodeUpdateService {
 		};
 
 		nodeLogger = new NodeLogger(node);
+		nodeLogger.setEnabled(false);
 
 		dataUpdateTimer = new Timer();
 		dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
@@ -178,20 +179,21 @@ public class NodeUpdateService {
 			}
 		}
 
+		new NodeLogger(node).log("Sending my " + signalsToSend.size());
 		nodeLogger.log("Sending: " + signalsToSend.size()
 				+ " nodes from myself");
 		nodeLogger.log("Keeping " + signalsToKeep.size() + " for myself");
 
 		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
-				copyMode);
+				copyMode, allMembersButMe);
 	}
 
 	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
-			final boolean copyMode) {
+			final boolean copyMode, final List<Address> receptors) {
 
-		latch = new CountDownLatch(signalsToSend.keySet().size());
+		latch = new CountDownLatch(receptors.size());
 
 		try {
 			Message msg = new Message(null, new GlobalSyncNodeMessage(
@@ -203,20 +205,37 @@ public class NodeUpdateService {
 						node.getBackupSignals().putAll(addr,
 								signalsToSend.get(addr));
 					}
-					waitingAddresses.add(addr);
 				}
 			}
-
+			waitingAddresses.addAll(receptors);
 			node.getChannel().send(msg);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		try {
-			latch.await(5, TimeUnit.SECONDS);
-		} catch (InterruptedException e) {
-			// waitingAddresses will contain the hanged addresses.
-			e.printStackTrace();
+			new NodeLogger(node).log("Waiting with " + latch.getCount());
+			if (!latch.await(5, TimeUnit.SECONDS)) {
+				throw new Exception("JA!!!");
+			}
+		} catch (Exception e) {
+			System.out.println("SOMEONE IGNORED MY MESSAGE!!!");
+			for (Address address : waitingAddresses) {
+				System.out.println("Sending to " + address);
+				new Message(address, new GlobalSyncNodeMessage(signalsToSend,
+						backupSignalsToSend, copyMode));
+			}
+
+			latch = new CountDownLatch(waitingAddresses.size());
+
+			try {
+				if (!latch.await(5, TimeUnit.SECONDS)) {
+					throw new Exception("JA!!!");
+				}
+			} catch (Exception e1) {
+				e1.printStackTrace();
+			}
+
 		}
 
 		synchronized (node.getLocalSignals()) {
@@ -288,6 +307,8 @@ public class NodeUpdateService {
 	}
 
 	public void notifyNodeAnswer(final GlobalSyncNodeMessageAnswer message) {
+		new NodeLogger(node).log("======== I got ANSWER from "
+				+ message.getOwner());
 		waitingAddresses.remove(message.getOwner());
 		latch.countDown();
 	}

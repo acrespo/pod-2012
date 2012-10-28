@@ -5,6 +5,7 @@ import java.io.PrintStream;
 public class NodeLogger {
 	private final Node node;
 	private final PrintStream stream;
+	private boolean enabled = true;
 
 	public NodeLogger(final Node node) {
 		this(node, System.out);
@@ -16,6 +17,16 @@ public class NodeLogger {
 	}
 
 	public void log(final String s) {
-		stream.println("[" + node.getAddress() + "]:" + s);
+		if (isEnabled()) {
+			stream.println("[" + node.getAddress() + "]:" + s);
+		}
+	}
+
+	public boolean isEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(final boolean enabled) {
+		this.enabled = enabled;
 	}
 }

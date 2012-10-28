@@ -46,9 +46,23 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	public void receive(final Message msg) {
 
 		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
-			synchronized (node) {
+			if (node.getChannel().isConnected()) {
 				onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
+			} else {
+				connectionPendingTasks.add(new Callable<Void>() {
+					@Override
+					public Void call() {
+						try {
+							onNewNodeSync(msg,
+									(GlobalSyncNodeMessage) msg.getObject());
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+						return null;
+					}
+				});
 			}
+
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessageAnswer) {
 			onNewNodeSyncAnswer((GlobalSyncNodeMessageAnswer) msg.getObject());
 		}
@@ -86,19 +100,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 					}
 				} else {
 
-					for (Address addr : node.getBackupSignals().keySet()) {
-						nodeLogger.log("I HAD: "
-								+ node.getBackupSignals().get(addr).size()
-								+ " FOR: " + addr);
-					}
-
 					Collection<Signal> signals = Lists.newArrayList(node
 							.getBackupSignals().get(msg.getSrc()));
-
-					nodeLogger
-							.log("IM GONNA REMOVE:"
-									+ message.getSignalsMap().values().size()
-									+ "nodes");
 
 					node.getBackupSignals().removeAll(msg.getSrc());
 
@@ -128,20 +131,20 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		reply.setObject(new GlobalSyncNodeMessageAnswer(node.getAddress()));
 		sendSafeAnswer(reply);
 
-		if (message.getDestinations().contains(node.getAddress())) {
-			nodeLogger.log("I received " + node.getLocalSignals().size()
-					+ " as a grand total");
-		}
-		if (message.isCopyMode()) {
-			nodeLogger.log("I received " + node.getBackupSignals().size()
-					+ " COPY signals");
-		} else {
-			for (Address addr : node.getBackupSignals().keySet()) {
-				nodeLogger.log("I HAVE NOW: "
-						+ node.getBackupSignals().get(addr).size() + " FOR: "
-						+ addr);
-			}
-		}
+		// if (message.getDestinations().contains(node.getAddress())) {
+		// nodeLogger.log("I got message from " + msg.getSrc());
+		// }
+		// if (message.isCopyMode()) {
+		// nodeLogger.log("I received " + node.getBackupSignals().size()
+		// + " COPY signals");
+		// } else {
+		// for (Address addr : node.getBackupSignals().keySet()) {
+		// nodeLogger.log("I HAVE NOW: "
+		// + node.getBackupSignals().get(addr).size() + " FOR: "
+		// + addr);
+		// }
+		// }
+		nodeLogger.log("I got message from " + msg.getSrc());
 	}
 
 	private void sendSafeAnswer(final Message reply) {
