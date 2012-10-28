@@ -32,4 +32,6 @@ public interface JGroupNode {
 
 	public NodeStats getStats();
 
+	public NodeListener getListener();
+
 }

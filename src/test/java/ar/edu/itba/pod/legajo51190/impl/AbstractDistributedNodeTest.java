@@ -120,10 +120,26 @@ public abstract class AbstractDistributedNodeTest {
 
 		if (!isBlocking) {
 			try {
-				controlLatch.await(3, TimeUnit.SECONDS);
+				if (!controlLatch.await(10, TimeUnit.SECONDS)) {
+					throw new InterruptedException();
+				}
+
 			} catch (InterruptedException e) {
 				throw new RuntimeException("Something didn't sync right");
 			}
+		}
+
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(nodes.size()
+				* nodesToTest.size());
+
+		listener.setNewNodeLatch(newNodeAwaitLatch);
+
+		try {
+			if (!newNodeAwaitLatch.await(15, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
+			}
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Something didn't sync right");
 		}
 
 	}
@@ -253,12 +269,11 @@ public abstract class AbstractDistributedNodeTest {
 
 		// We add nodes to the first member and await it to
 		SignalNode first = nodesToTest.getFirst();
+
 		addSignalsToNode(first, 2400);
 		Thread.sleep(2000);
 
 		addNewNodes(1);
-
-		Thread.sleep(2000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.getLast());
@@ -279,12 +294,12 @@ public abstract class AbstractDistributedNodeTest {
 
 		// We add nodes to the first member and await it to
 		SignalNode first = nodesToTest.getFirst();
+
 		addSignalsToNode(first, 1000);
+
 		Thread.sleep(2000);
 
 		addNewNodes(2);
-
-		Thread.sleep(2000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeStoreIsNotEmpty(nodesToTest.getFirst());
 		assertNodeStoreIsNotEmpty(nodesToTest.get(1));
@@ -304,8 +319,6 @@ public abstract class AbstractDistributedNodeTest {
 
 		addNewNodes(1);
 
-		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
-
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));
 		assertNodeIsNotEmpty(nodesToTest.getLast());
@@ -324,13 +337,9 @@ public abstract class AbstractDistributedNodeTest {
 
 		addNewNodes(1);
 
-		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
-
 		assertTotalAmountIs(2400);
 
 		addNewNodes(1);
-
-		Thread.sleep(10000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));

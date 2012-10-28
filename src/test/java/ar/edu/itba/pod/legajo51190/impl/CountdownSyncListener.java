@@ -14,10 +14,11 @@ import org.jgroups.ChannelListener;
  * 
  * @author cris
  */
-public class CountdownSyncListener implements ChannelListener {
+public class CountdownSyncListener implements ChannelListener, NodeListener {
 
 	private CountDownLatch disconnectionLatch = null;
 	private CountDownLatch connectionLatch = null;
+	private CountDownLatch newNodeLatch = null;
 
 	public void setDisconnectionLatch(final CountDownLatch disconnectionLatch) {
 		this.disconnectionLatch = disconnectionLatch;
@@ -44,6 +45,17 @@ public class CountdownSyncListener implements ChannelListener {
 	@Override
 	public void channelClosed(final Channel channel) {
 
+	}
+
+	@Override
+	public void onNodeSyncDone() {
+		if (newNodeLatch != null) {
+			newNodeLatch.countDown();
+		}
+	}
+
+	public void setNewNodeLatch(final CountDownLatch newNodeLatch) {
+		this.newNodeLatch = newNodeLatch;
 	}
 
 }

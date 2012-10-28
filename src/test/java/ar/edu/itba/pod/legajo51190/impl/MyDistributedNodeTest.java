@@ -5,7 +5,6 @@ import java.util.Set;
 
 import org.jgroups.ChannelListener;
 
-
 public class MyDistributedNodeTest extends AbstractDistributedNodeTest {
 
 	@Override
@@ -17,7 +16,7 @@ public class MyDistributedNodeTest extends AbstractDistributedNodeTest {
 
 		MultiThreadedSignalProcessor processor;
 		try {
-			processor = new MultiThreadedSignalProcessor(2, listeners);
+			processor = new MultiThreadedSignalProcessor(2, listeners, listener);
 			return new CompositeTestableSignalNode(processor, processor,
 					listener);
 		} catch (Exception e) {

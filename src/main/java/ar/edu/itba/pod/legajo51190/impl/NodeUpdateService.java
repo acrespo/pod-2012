@@ -73,6 +73,11 @@ public class NodeUpdateService {
 										signalsCopy, HashMultimap.create(node
 												.getBackupSignals()));
 								node.getToDistributeSignals().clear();
+
+								nodeLogger.log("Updated!");
+								if (node.getListener() != null) {
+									node.getListener().onNodeSyncDone();
+								}
 							}
 
 						}
@@ -113,6 +118,11 @@ public class NodeUpdateService {
 									new_view.getMembers(),
 									signalsCopy,
 									HashMultimap.create(node.getBackupSignals()));
+
+							nodeLogger.log("Updated!");
+							if (node.getListener() != null) {
+								node.getListener().onNodeSyncDone();
+							}
 						}
 
 					}
@@ -186,20 +196,23 @@ public class NodeUpdateService {
 		nodeLogger.flush();
 
 		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
-				copyMode, allMembersButMe);
+				copyMode, allMembersButMe, allMembers);
 	}
 
 	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
-			final boolean copyMode, final List<Address> receptors) {
+			final boolean copyMode, final List<Address> receptors,
+			final List<Address> allMembers) {
 
 		latch = new CountDownLatch(receptors.size());
 
 		try {
+
 			for (Address receptor : receptors) {
 				Message msg = new Message(receptor, new GlobalSyncNodeMessage(
-						signalsToSend, backupSignalsToSend, copyMode));
+						signalsToSend, backupSignalsToSend, copyMode,
+						allMembers));
 				node.getChannel().send(msg);
 			}
 
@@ -225,7 +238,7 @@ public class NodeUpdateService {
 			for (Address address : waitingAddresses) {
 				System.out.println("Sending to " + address);
 				new Message(address, new GlobalSyncNodeMessage(signalsToSend,
-						backupSignalsToSend, copyMode));
+						backupSignalsToSend, copyMode, allMembers));
 			}
 
 			latch = new CountDownLatch(waitingAddresses.size());

@@ -123,10 +123,10 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 					signals.removeAll(message.getSignalsMap().values());
 
-					List<Address> allThirdKindMembers = Lists.newArrayList(node
-							.getAliveNodes());
-					List<Address> allMembers = Lists.newArrayList(node
-							.getAliveNodes());
+					List<Address> allThirdKindMembers = Lists
+							.newArrayList(message.getAllMembers());
+					List<Address> allMembers = Lists.newArrayList(message
+							.getAllMembers());
 
 					allThirdKindMembers.removeAll(message.getDestinations());
 					allThirdKindMembers.remove(msg.getSrc());
@@ -164,7 +164,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		sendSafeAnswer(reply);
 
 		// if (message.getDestinations().contains(node.getAddress())) {
-		// nodeLogger.log("I got message from " + msg.getSrc());
+		nodeLogger.log("I got message from " + msg.getSrc());
 		// }
 		// if (message.isCopyMode()) {
 		// nodeLogger.log("I received " + node.getBackupSignals().size()

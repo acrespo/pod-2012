@@ -30,13 +30,15 @@ public class Node implements JGroupNode {
 	private final Set<Signal> toDistributeSignals;
 
 	private final Channel channel;
+	private final NodeListener listener;
 
 	public Node(final Set<Signal> signals, final Channel channel,
-			final Set<Signal> toDistributeSignals) {
+			final Set<Signal> toDistributeSignals, final NodeListener listener) {
 		super();
 		this.signals = signals;
 		this.channel = channel;
 		this.toDistributeSignals = toDistributeSignals;
+		this.listener = listener;
 		Multimap<Address, Signal> sig = HashMultimap.create();
 		backupSignals = Multimaps.synchronizedMultimap(sig);
 	}
@@ -111,5 +113,9 @@ public class Node implements JGroupNode {
 		// TODO: Improve nodestats implementation
 		return new NodeStats(getAddress().toString(), 0, signals.size(),
 				backupSignals.size(), false);
+	}
+
+	public NodeListener getListener() {
+		return listener;
 	}
 }
