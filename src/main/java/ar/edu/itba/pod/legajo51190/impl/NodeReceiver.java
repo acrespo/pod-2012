@@ -121,9 +121,6 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 					node.getBackupSignals().removeAll(msg.getSrc());
 
-					Set<Signal> signalsIntersection = Sets.intersection(
-							signals,
-							Sets.newHashSet(message.getSignalsMap().values()));
 					signals.removeAll(message.getSignalsMap().values());
 
 					List<Address> allThirdKindMembers = Lists.newArrayList(node
@@ -135,7 +132,6 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 					allThirdKindMembers.remove(msg.getSrc());
 
 					for (Address address : message.getSignalsMap().keySet()) {
-
 						for (Signal signal : message.getSignalsMap().get(
 								address)) {
 							Address owner = updateService.getAddressForSignal(
@@ -143,14 +139,9 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 							if (owner.equals(node.getAddress())) {
 								node.getBackupSignals().put(address, signal);
-							} else {
-								nodeLogger.logAcum(owner.toString());
 							}
 
 						}
-						// node.getBackupSignals().putAll(address,
-						// message.getSignalsMap().get(address));
-
 					}
 
 					node.getBackupSignals().putAll(msg.getSrc(), signals);

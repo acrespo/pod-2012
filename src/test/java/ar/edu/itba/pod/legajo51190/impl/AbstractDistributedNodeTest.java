@@ -330,7 +330,7 @@ public abstract class AbstractDistributedNodeTest {
 
 		addNewNodes(1);
 
-		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
+		Thread.sleep(10000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));
