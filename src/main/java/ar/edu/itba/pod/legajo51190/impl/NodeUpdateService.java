@@ -62,23 +62,20 @@ public class NodeUpdateService {
 						synchronized (node.getToDistributeSignals()) {
 							signalsCopy.addAll(node.getToDistributeSignals());
 							if (node.getToDistributeSignals().size() > 0) {
-								synchronized (node) {
 
-									Set<Address> allMembersButMyself = new HashSet<>(
-											node.getAliveNodes());
+								Set<Address> allMembersButMyself = new HashSet<>(
+										node.getAliveNodes());
 
-									allMembersButMyself.remove(node
-											.getAddress());
+								allMembersButMyself.remove(node.getAddress());
 
-									nodeLogger.log("Updating my new nodes...");
-									syncNewMembers(Lists
-											.newArrayList(allMembersButMyself),
-											Lists.newArrayList(node
-													.getAliveNodes()),
-											signalsCopy);
-									node.getToDistributeSignals().clear();
-								}
+								nodeLogger.log("Updating my new nodes...");
+								syncNewMembers(
+										Lists.newArrayList(allMembersButMyself),
+										Lists.newArrayList(node.getAliveNodes()),
+										signalsCopy);
+								node.getToDistributeSignals().clear();
 							}
+
 						}
 					}
 				} catch (Exception e) {
@@ -99,25 +96,23 @@ public class NodeUpdateService {
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
-						synchronized (node) {
-							if (goneMembers.size() > 0) {
-								syncGoneMembers(goneMembers);
-							}
-							if (newMembers.size() > 0
-									&& node.getLocalSignals().size() > 0) {
-
-								Set<Signal> signalsCopy = null;
-								synchronized (node.getLocalSignals()) {
-									signalsCopy = new HashSet<>(node
-											.getLocalSignals());
-								}
-
-								nodeLogger.log("New node! Sending data...");
-								syncNewMembers(Lists.newArrayList(newMembers),
-										new_view.getMembers(), signalsCopy);
-							}
-
+						if (goneMembers.size() > 0) {
+							syncGoneMembers(goneMembers);
 						}
+						if (newMembers.size() > 0
+								&& node.getLocalSignals().size() > 0) {
+
+							Set<Signal> signalsCopy = null;
+							synchronized (node.getLocalSignals()) {
+								signalsCopy = new HashSet<>(node
+										.getLocalSignals());
+							}
+
+							nodeLogger.log("New node! Sending data...");
+							syncNewMembers(Lists.newArrayList(newMembers),
+									new_view.getMembers(), signalsCopy);
+						}
+
 					}
 					node.setNodeView(new_view);
 				} catch (Exception e) {
@@ -164,18 +159,20 @@ public class NodeUpdateService {
 		} else {
 			List<Address> newMembersAndMe = new ArrayList<>(newMembers);
 			newMembersAndMe.add(node.getAddress());
-			for (Address backupAddr : node.getBackupSignals().keySet()) {
-				for (Signal sign : node.getBackupSignals().get(backupAddr)) {
-					Address addressToSendData = getAddressForSignal(sign,
-							allMembersButMe, allMembers);
-					if (!addressToSendData.equals(node.getAddress())
-							&& newMembersAndMe.contains(addressToSendData)) {
-						backupSignalsToSend.put(backupAddr, sign);
+			synchronized (node.getBackupSignals()) {
+				for (Address backupAddr : node.getBackupSignals().keySet()) {
+					for (Signal sign : node.getBackupSignals().get(backupAddr)) {
+						Address addressToSendData = getAddressForSignal(sign,
+								allMembersButMe, allMembers);
+						if (!addressToSendData.equals(node.getAddress())
+								&& newMembersAndMe.contains(addressToSendData)) {
+							backupSignalsToSend.put(backupAddr, sign);
+						}
 					}
+					// nodeLogger.log("Sending: "
+					// + backupSignalsToSend.get(backupAddr).size()
+					// + " nodes from " + backupAddr);
 				}
-				// nodeLogger.log("Sending: "
-				// + backupSignalsToSend.get(backupAddr).size()
-				// + " nodes from " + backupAddr);
 			}
 		}
 
@@ -239,18 +236,20 @@ public class NodeUpdateService {
 		}
 
 		synchronized (node.getLocalSignals()) {
-			for (Address addr : signalsToSend.keySet()) {
-				node.getLocalSignals().removeAll(signalsToSend.get(addr));
-			}
-
-			for (Address addr : node.getBackupSignals().keySet()) {
-				for (Signal signal : backupSignalsToSend.get(addr)) {
-					node.getBackupSignals().remove(addr, signal);
+			synchronized (node.getBackupSignals()) {
+				for (Address addr : signalsToSend.keySet()) {
+					node.getLocalSignals().removeAll(signalsToSend.get(addr));
 				}
-			}
 
-			node.getLocalSignals().addAll(signalsToKeep);
-			// syncGoneMembers(new HashSet<Address>(waitingAddresses));
+				for (Address addr : node.getBackupSignals().keySet()) {
+					for (Signal signal : backupSignalsToSend.get(addr)) {
+						node.getBackupSignals().remove(addr, signal);
+					}
+				}
+
+				node.getLocalSignals().addAll(signalsToKeep);
+				// syncGoneMembers(new HashSet<Address>(waitingAddresses));
+			}
 		}
 
 		nodeLogger.log("I have " + node.getLocalSignals().size()
@@ -262,14 +261,16 @@ public class NodeUpdateService {
 			nodeLogger
 					.log("More than one member is gone, we might have lost messages :(");
 		}
-		synchronized (node.getLocalSignals()) {
-			for (Address address : goneMembers) {
-				nodeLogger.log("Recovering backups from " + address.toString()
-						+ " size: "
-						+ node.getBackupSignals().get(address).size());
-				node.getLocalSignals().addAll(
-						node.getBackupSignals().get(address));
-				node.getBackupSignals().removeAll(address);
+		synchronized (node.getBackupSignals()) {
+			synchronized (node.getLocalSignals()) {
+				for (Address address : goneMembers) {
+					nodeLogger.log("Recovering backups from "
+							+ address.toString() + " size: "
+							+ node.getBackupSignals().get(address).size());
+					node.getLocalSignals().addAll(
+							node.getBackupSignals().get(address));
+					node.getBackupSignals().removeAll(address);
+				}
 			}
 		}
 	}

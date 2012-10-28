@@ -209,7 +209,7 @@ public abstract class AbstractDistributedNodeTest {
 		}
 
 		System.out.println("Total stored: " + sumStored);
-		System.out.println("Total stored: " + sumBackuped);
+		System.out.println("Total backuped: " + sumBackuped);
 
 		Assert.assertEquals(stored, sumStored);
 		Assert.assertEquals(stored, sumBackuped);
@@ -306,9 +306,11 @@ public abstract class AbstractDistributedNodeTest {
 
 		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
 
+		assertTotalAmountIs(1500);
+
 		addNewNodes(1);
 
-		Thread.sleep(5000); // Time to sync TODO: Make this synchronizable
+		Thread.sleep(15000); // Time to sync TODO: Make this synchronizable
 
 		assertNodeIsNotEmpty(nodesToTest.getFirst());
 		assertNodeIsNotEmpty(nodesToTest.get(1));

@@ -22,6 +22,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private final Node node;
 	private final BlockingQueue<Callable<Void>> connectionPendingTasks;
 	private final ExecutorService connectionService;
+	private final ExecutorService workerService;
 	private final NodeLogger nodeLogger;
 
 	public NodeReceiver(final Node node) {
@@ -30,6 +31,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		connectionService = Executors.newCachedThreadPool();
 		connectionPendingTasks = new LinkedBlockingQueue<>();
 		nodeLogger = new NodeLogger(node);
+		workerService = Executors.newSingleThreadExecutor();
 	}
 
 	@Override
@@ -47,14 +49,28 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
 			if (node.getChannel().isConnected()) {
-				onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
+				workerService.submit(new Runnable() {
+					@Override
+					public void run() {
+						onNewNodeSync(msg,
+								(GlobalSyncNodeMessage) msg.getObject());
+					}
+				});
 			} else {
 				connectionPendingTasks.add(new Callable<Void>() {
 					@Override
 					public Void call() {
 						try {
-							onNewNodeSync(msg,
-									(GlobalSyncNodeMessage) msg.getObject());
+							workerService.submit(new Runnable() {
+
+								@Override
+								public void run() {
+									onNewNodeSync(msg,
+											(GlobalSyncNodeMessage) msg
+													.getObject());
+								}
+							});
+
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -75,15 +91,15 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private void onNewNodeSync(final Message msg,
 			final GlobalSyncNodeMessage message) {
 
-		if (message.getDestinations().contains(node.getAddress())) {
-			// We got all the new signals, so we save them
-			synchronized (node.getLocalSignals()) {
-				node.getLocalSignals().addAll(
-						message.getSignalsMap().get(node.getAddress()));
-			}
-		}
-
 		synchronized (node.getBackupSignals()) {
+			synchronized (node.getLocalSignals()) {
+				if (message.getDestinations().contains(node.getAddress())) {
+					// We got all the new signals, so we save them
+					node.getLocalSignals().addAll(
+							message.getSignalsMap().get(node.getAddress()));
+				}
+			}
+
 			// Copy mode is for when no backups are done
 			// If backups are already distributed then we proceed from this
 			// branch
@@ -138,11 +154,13 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// nodeLogger.log("I received " + node.getBackupSignals().size()
 		// + " COPY signals");
 		// } else {
-		// for (Address addr : node.getBackupSignals().keySet()) {
-		// nodeLogger.log("I HAVE NOW: "
-		// + node.getBackupSignals().get(addr).size() + " FOR: "
-		// + addr);
-		// }
+		if (!message.isCopyMode()) {
+			for (Address addr : node.getBackupSignals().keySet()) {
+				nodeLogger.log("I HAVE NOW: "
+						+ node.getBackupSignals().get(addr).size() + " FOR: "
+						+ addr);
+			}
+		}
 		// }
 		nodeLogger.log("I got message from " + msg.getSrc());
 	}
