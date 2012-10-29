@@ -88,7 +88,6 @@ public class NodeUpdateService {
 						final Set<Signal> signalsCopy = new HashSet<>();
 						synchronized (node.getToDistributeSignals()) {
 							signalsCopy.addAll(node.getToDistributeSignals());
-							node.getToDistributeSignals().clear();
 						}
 
 						if (signalsCopy.size() > 0) {
@@ -112,6 +111,7 @@ public class NodeUpdateService {
 										Lists.newArrayList(allMembersButMyself),
 										Lists.newArrayList(node.getAliveNodes()),
 										signalsCopy, copyOfBackupSignals);
+								node.getToDistributeSignals().clear();
 							}
 
 							if (node.getToDistributeSignals().isEmpty()
