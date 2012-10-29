@@ -72,7 +72,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 	@Override
 	public void join(final String clusterName) throws RemoteException {
 		try {
-			node.getChannel().connect(clusterName);
+			node.joinChannel(clusterName);
 		} catch (Exception e) {
 			throw new RemoteException(e.getMessage());
 		}
@@ -80,13 +80,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	@Override
 	public void exit() throws RemoteException {
-		synchronized (node.getToDistributeSignals()) {
-			synchronized (node.getLocalSignals()) {
-				node.getLocalSignals().clear();
-				node.getToDistributeSignals().clear();
-				node.getChannel().close();
-			}
-		}
+		node.exit();
 	}
 
 	@Override

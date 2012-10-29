@@ -67,7 +67,13 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			onNewNodeSyncAnswer((GlobalSyncNodeMessageAnswer) msg.getObject());
 		} else if (msg.getObject() instanceof NewNodeReadyMessage) {
 			onNotifyNewNodeReady();
+		} else if (msg.getObject() instanceof GoneMessageSentNodeMessage) {
+			onNotifyGoneMessageReceived();
 		}
+	}
+
+	private void onNotifyGoneMessageReceived() {
+		updateService.notifyGoneMessage();
 	}
 
 	private void onNotifyNewNodeReady() {

@@ -1,5 +1,6 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
+import java.rmi.RemoteException;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,8 +34,11 @@ public class Node implements JGroupNode {
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final Set<Signal> toDistributeSignals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+	private final Set<Signal> redistributionSignals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final Channel channel;
 	private final NodeListener listener;
+	private final AtomicBoolean online = new AtomicBoolean(false);
 
 	public Node(final NodeListener listener) throws Exception {
 		super();
@@ -112,12 +116,47 @@ public class Node implements JGroupNode {
 	@Override
 	public NodeStats getStats() {
 		// TODO: Improve nodestats implementation
-		return new NodeStats(getAddress().toString(), 0, signals.size(),
-				backupSignals.size(), false);
+		return new NodeStats(getAddress().toString(), 0, signals.size()
+				+ redistributionSignals.size(), backupSignals.size(), false);
 	}
 
 	@Override
 	public NodeListener getListener() {
 		return listener;
+	}
+
+	@Override
+	public Set<Signal> getRedistribuitionSignals() {
+		return redistributionSignals;
+	}
+
+	@Override
+	public boolean isOnline() {
+		return online.get();
+	}
+
+	@Override
+	public void joinChannel(final String name) throws RemoteException {
+		try {
+			getChannel().connect(name);
+			online.set(true);
+		} catch (Exception e) {
+			throw new RemoteException(e.getMessage());
+		}
+
+	}
+
+	public void exit() {
+		online.set(false);
+		synchronized (getToDistributeSignals()) {
+			synchronized (getLocalSignals()) {
+				synchronized (getRedistribuitionSignals()) {
+					getLocalSignals().clear();
+					getToDistributeSignals().clear();
+					getRedistribuitionSignals().clear();
+				}
+			}
+		}
+		getChannel().close();
 	}
 }

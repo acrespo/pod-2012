@@ -193,26 +193,27 @@ public class NodeTestController {
 
 		System.out.println("===== Removing node "
 				+ n.getJGroupNode().getAddress());
+
 		getNodesToTest().remove(n);
+
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
+				nodesToTest.size());
+		listener.setGoneMemberLatch(newNodeAwaitLatch);
+
 		try {
 			n.exit();
 		} catch (RemoteException e1) {
 			e1.printStackTrace();
 		}
 
-		// CountDownLatch newNodeAwaitLatch = new CountDownLatch(
-		// nodesToTest.size());
-		//
-		// listener.setNewNodeLatch(newNodeAwaitLatch);
-		//
-		// try {
-		// if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
-		// throw new InterruptedException();
-		// }
-		// } catch (InterruptedException e) {
-		// e.printStackTrace();
-		// // throw new RuntimeException("Something didn't sync right");
-		// }
+		try {
+			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+			// throw new RuntimeException("Something didn't sync right");
+		}
 	}
 
 	public SyncListener getListener() {

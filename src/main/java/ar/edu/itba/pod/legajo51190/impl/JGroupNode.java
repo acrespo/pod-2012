@@ -1,5 +1,6 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
+import java.rmi.RemoteException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -31,6 +32,8 @@ public interface JGroupNode {
 
 	public Set<Signal> getLocalSignals();
 
+	public Set<Signal> getRedistribuitionSignals();
+
 	public Set<Signal> getToDistributeSignals();
 
 	public Multimap<Address, Signal> getBackupSignals();
@@ -39,4 +42,7 @@ public interface JGroupNode {
 
 	public NodeListener getListener();
 
+	public boolean isOnline();
+
+	public void joinChannel(String name) throws RemoteException;
 }

@@ -19,6 +19,11 @@ public class SyncListener implements ChannelListener, NodeListener {
 	private CountDownLatch disconnectionLatch = null;
 	private CountDownLatch connectionLatch = null;
 	private CountDownLatch newNodeLatch = null;
+	private CountDownLatch goneMemberLatch = null;
+
+	public void setNewNodeLatch(final CountDownLatch newNodeLatch) {
+		this.newNodeLatch = newNodeLatch;
+	}
 
 	public void setDisconnectionLatch(final CountDownLatch disconnectionLatch) {
 		this.disconnectionLatch = disconnectionLatch;
@@ -26,6 +31,10 @@ public class SyncListener implements ChannelListener, NodeListener {
 
 	public void setConnectionLatch(final CountDownLatch connectionLatch) {
 		this.connectionLatch = connectionLatch;
+	}
+
+	public void setGoneMemberLatch(final CountDownLatch goneMemberLatch) {
+		this.goneMemberLatch = goneMemberLatch;
 	}
 
 	@Override
@@ -52,11 +61,13 @@ public class SyncListener implements ChannelListener, NodeListener {
 		if (newNodeLatch != null) {
 			newNodeLatch.countDown();
 		}
-		System.out.println("Done countdown!");
 	}
 
-	public void setNewNodeLatch(final CountDownLatch newNodeLatch) {
-		this.newNodeLatch = newNodeLatch;
+	@Override
+	public void onNodeGoneSyncDone() {
+		if (goneMemberLatch != null) {
+			goneMemberLatch.countDown();
+		}
 	}
 
 }

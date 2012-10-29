@@ -1,6 +1,7 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,6 +51,11 @@ public class NodeUpdateService {
 	 */
 	private CountDownLatch awaitLatch;
 	/**
+	 * Latch for awaiting the signal from the rest of the nodes of the group on
+	 * the notification of readyness after a gone member
+	 */
+	private CountDownLatch memberGoneLatch;
+	/**
 	 * Timer that polls the "to distribute signals" for new elements in order to
 	 * send them.
 	 */
@@ -92,10 +98,8 @@ public class NodeUpdateService {
 
 						if (signalsCopy.size() > 0) {
 
-							// TODO: DRY this references if possible
-							List<Address> allMembersButMyself = Lists
-									.newArrayList(node.getAliveNodes());
-							allMembersButMyself.remove(node.getAddress());
+							List<Address> allMembersButMyself = getAllNodesButMe(
+									node, node.getAliveNodes());
 
 							// TODO: Take this out.
 							Multimap<Address, Signal> copyOfBackupSignals = null;
@@ -127,8 +131,16 @@ public class NodeUpdateService {
 					e.printStackTrace();
 				}
 			}
+
 		}, 0, 1000);
 
+	}
+
+	private List<Address> getAllNodesButMe(final Node node,
+			final Collection<Address> list) {
+		List<Address> allMembersButMyself = Lists.newArrayList(list);
+		allMembersButMyself.remove(node.getAddress());
+		return allMembersButMyself;
 	}
 
 	public void updateFromView(final View new_view) {
@@ -141,7 +153,7 @@ public class NodeUpdateService {
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
 						if (goneMembers.size() > 0) {
-							resolveGoneMembers(goneMembers);
+							resolveGoneMembers(goneMembers, new_view);
 						}
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
@@ -375,40 +387,92 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers,
 			final Address address) {
-		try {
-			node.getChannel().send(
-					new Message(address, new GlobalSyncNodeMessage(
-							signalsToSend, backupSignalsToSend, copyMode,
-							allMembers)));
-		} catch (Exception e1) {
-			e1.printStackTrace();
+		if (node.getChannel().isConnected() && node.getChannel().isOpen()) {
+			try {
+				node.getChannel().send(
+						new Message(address, new GlobalSyncNodeMessage(
+								signalsToSend, backupSignalsToSend, copyMode,
+								allMembers)));
+			} catch (Exception e1) {
+				e1.printStackTrace();
+			}
 		}
 	}
 
 	/**
 	 * Recovers the backups from the fallen nodes. If more than one member is
 	 * gone we cannot guarantee the recovery of all messages.
-	 * 
-	 * TODO: Implements this well.
 	 */
-	private void resolveGoneMembers(final Set<Address> goneMembers) {
+	private void resolveGoneMembers(final Set<Address> goneMembers,
+			final View view) {
 		if (goneMembers.size() > 1) {
 			nodeLogger
 					.log("More than one member is gone, we might have lost messages :(");
 		}
 		synchronized (node.getBackupSignals()) {
 			synchronized (node.getLocalSignals()) {
-				for (Address address : goneMembers) {
-					nodeLogger.log("Recovering backups from "
-							+ address.toString() + " size: "
-							+ node.getBackupSignals().get(address).size());
-					node.getToDistributeSignals().addAll(
-							node.getBackupSignals().get(address));
+				synchronized (node.getRedistribuitionSignals()) {
+					for (Address address : goneMembers) {
+						nodeLogger.log("Recovering backups from "
+								+ address.toString() + " size: "
+								+ node.getBackupSignals().get(address).size());
+						node.getRedistribuitionSignals().addAll(
+								node.getBackupSignals().get(address));
+					}
+					node.getRedistribuitionSignals().addAll(
+							node.getLocalSignals());
+					node.getBackupSignals().clear();
+					node.getLocalSignals().clear();
+					node.getToDistributeSignals().clear();
+					timerEnabled.set(false);
 				}
-				node.getToDistributeSignals().addAll(node.getLocalSignals());
-				node.getBackupSignals().clear();
-				node.getLocalSignals().clear();
 			}
+		}
+
+		Set<Signal> signalsCopy = null;
+		synchronized (node.getRedistribuitionSignals()) {
+			signalsCopy = new HashSet<>(node.getRedistribuitionSignals());
+		}
+
+		Multimap<Address, Signal> copyOfBackupSignals = null;
+
+		synchronized (node.getBackupSignals()) {
+			copyOfBackupSignals = HashMultimap.create(node.getBackupSignals());
+		}
+
+		synchronized (node) {
+
+			List<Address> allMembersButMyself = getAllNodesButMe(node,
+					view.getMembers());
+
+			memberGoneLatch = new CountDownLatch(allMembersButMyself.size());
+
+			syncMembers(allMembersButMyself, view.getMembers(), signalsCopy,
+					copyOfBackupSignals);
+
+			tellOtherNodesImDoneRedistributingData();
+
+			try {
+				memberGoneLatch.await(3000, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			node.getRedistribuitionSignals().clear();
+
+			if (node.getListener() != null) {
+				node.getListener().onNodeGoneSyncDone();
+			}
+		}
+	}
+
+	private void tellOtherNodesImDoneRedistributingData() {
+		Message tellImDone = new Message(null, new GoneMessageSentNodeMessage());
+
+		try {
+			node.getChannel().send(tellImDone);
+		} catch (Exception e1) {
+			e1.printStackTrace();
 		}
 	}
 
@@ -468,6 +532,12 @@ public class NodeUpdateService {
 	public void notifyNewNodeReady() {
 		if (awaitLatch != null) {
 			awaitLatch.countDown();
+		}
+	}
+
+	public void notifyGoneMessage() {
+		if (memberGoneLatch != null) {
+			memberGoneLatch.countDown();
 		}
 	}
 }
