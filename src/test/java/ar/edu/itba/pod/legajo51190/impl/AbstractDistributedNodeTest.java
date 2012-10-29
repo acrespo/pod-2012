@@ -14,6 +14,7 @@ import junit.framework.Assert;
 
 import org.jgroups.Address;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.signal.source.RandomSource;
@@ -136,9 +137,14 @@ public abstract class AbstractDistributedNodeTest {
 				throw new RuntimeException("Something didn't sync right");
 			}
 		}
-
-		CountDownLatch newNodeAwaitLatch = new CountDownLatch(nodes.size()
-				* nodesToTest.size());
+		//
+		// System.out.println("Nodes to test: " + nodesToTest.size() +
+		// " nodes");
+		// System.out.println("Awaiting for: " + nodes.size() *
+		// nodesToTest.size()
+		// + " nodes");
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
+				nodes.size() == 0 ? 0 : nodesToTest.size());
 
 		listener.setNewNodeLatch(newNodeAwaitLatch);
 
@@ -162,6 +168,9 @@ public abstract class AbstractDistributedNodeTest {
 	 */
 	private void addSignalsToNode(final SignalNode node,
 			final int amountOfSignals) {
+		System.out.println("===== Adding " + amountOfSignals + " signals to "
+				+ node.getJGroupNode().getAddress());
+
 		for (int i = 0; i < amountOfSignals; i++) {
 			try {
 				node.add(src.next());
@@ -170,13 +179,12 @@ public abstract class AbstractDistributedNodeTest {
 			}
 		}
 
-		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
-				1 * nodesToTest.size());
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
 
 		listener.setNewNodeLatch(newNodeAwaitLatch);
 
 		try {
-			if (!newNodeAwaitLatch.await(15, TimeUnit.SECONDS)) {
+			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
 				throw new InterruptedException();
 			}
 		} catch (InterruptedException e) {
@@ -203,6 +211,31 @@ public abstract class AbstractDistributedNodeTest {
 		joinNodesToChannel(nodes, connectionLatch);
 
 		nodesToTest.addAll(nodes);
+	}
+
+	private void removeNode(final SignalNode n) {
+
+		System.out.println("===== Removing node "
+				+ n.getJGroupNode().getAddress());
+		nodesToTest.remove(n);
+		try {
+			n.exit();
+		} catch (RemoteException e1) {
+			e1.printStackTrace();
+		}
+
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
+				nodesToTest.size());
+
+		listener.setNewNodeLatch(newNodeAwaitLatch);
+
+		try {
+			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
+			}
+		} catch (InterruptedException e) {
+			// throw new RuntimeException("Something didn't sync right");
+		}
 	}
 
 	/**
@@ -282,7 +315,7 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	public void synchronizeOnNewMember() throws InterruptedException,
+	public void synchronizeData1Member() throws InterruptedException,
 			IOException {
 
 		// Initial group size: 1 member
@@ -306,7 +339,7 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	public void synchronizeOnTwoNewMembers() throws InterruptedException,
+	public void synchronizeData2Members() throws InterruptedException,
 			IOException {
 
 		// Initial group size: 1 member
@@ -331,9 +364,9 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	public void synchronizeOnSecondNewMember() throws InterruptedException,
+	public void synchronizeData1Member1Member() throws InterruptedException,
 			IOException {
-		synchronizeOnNewMember();
+		synchronizeData1Member();
 
 		addNewNodes(1);
 
@@ -344,14 +377,32 @@ public abstract class AbstractDistributedNodeTest {
 	}
 
 	/**
+	 * 1 node joins a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeData1Member2Members() throws InterruptedException,
+			IOException {
+		synchronizeData1Member();
+
+		addNewNodes(2);
+
+		assertNodeIsNotEmpty(nodesToTest.getFirst());
+		assertNodeIsNotEmpty(nodesToTest.get(2));
+		assertNodeIsNotEmpty(nodesToTest.getLast());
+		assertTotalAmountIs(2400);
+	}
+
+	/**
 	 * 2 node join a channel with two nodes syncd.
 	 * 
 	 * @throws IOException
 	 */
 	@Test
-	public void synchronizeOnSecondTimeWithTwoMembers()
+	public void synchronizeData1Member1Member1Member()
 			throws InterruptedException, IOException {
-		synchronizeOnNewMember();
+		synchronizeData1Member();
 
 		addNewNodes(1);
 
@@ -364,6 +415,47 @@ public abstract class AbstractDistributedNodeTest {
 		assertNodeIsNotEmpty(nodesToTest.get(2));
 		assertNodeIsNotEmpty(nodesToTest.getLast());
 		assertTotalAmountIs(2400);
+	}
+
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeData3MembersAndAdd21600Signals()
+			throws InterruptedException, IOException {
+		synchronizeData1Member1Member1Member();
+
+		addSignalsToNode(nodesToTest.getLast(), 21600);
+
+		assertNodeIsNotEmpty(nodesToTest.getFirst());
+		assertNodeIsNotEmpty(nodesToTest.get(1));
+		assertNodeIsNotEmpty(nodesToTest.get(2));
+		assertNodeIsNotEmpty(nodesToTest.getLast());
+		assertTotalAmountIs(24000);
+	}
+
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	@Ignore
+	public void synchronizeDoLotsOfStuffAndDeleteNode()
+			throws InterruptedException, IOException {
+		synchronizeData1Member1Member1Member();
+
+		addSignalsToNode(nodesToTest.getLast(), 2400);
+
+		assertTotalAmountIs(4800);
+
+		removeNode(nodesToTest.getFirst());
+
+		Thread.sleep(5000);
+
+		assertTotalAmountIs(4800);
 	}
 
 }
