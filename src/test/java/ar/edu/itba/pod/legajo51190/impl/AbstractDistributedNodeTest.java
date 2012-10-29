@@ -27,7 +27,7 @@ import ar.edu.itba.pod.signal.source.RandomSource;
  */
 public abstract class AbstractDistributedNodeTest {
 
-	private final CountdownSyncListener listener = new CountdownSyncListener();
+	private final SyncListener listener = new SyncListener();
 
 	private static final LinkedList<SignalNode> nodesToTest = new LinkedList<>();
 
@@ -39,7 +39,7 @@ public abstract class AbstractDistributedNodeTest {
 	}
 
 	public abstract SignalNode createNewSignalNode(
-			CountdownSyncListener listener);
+			SyncListener listener);
 
 	/**
 	 * Must disconnect all processors and block until it's done.
@@ -283,9 +283,11 @@ public abstract class AbstractDistributedNodeTest {
 
 			localSize.put(jNode.getAddress(), jNode.getLocalSignals().size());
 
-			NodeLogger logger = new NodeLogger((Node) jNode);
+			NodeLogger logger = new NodeLogger(jNode);
 
-			// logger.log("=== Local data: " + jNode.getLocalSignals().size());
+			logger.setEnabled(false);
+
+			logger.log("=== Local data: " + jNode.getLocalSignals().size());
 
 			for (Address addr : jNode.getBackupSignals().keySet()) {
 				if (!backupSize.containsKey(addr)) {
@@ -295,8 +297,8 @@ public abstract class AbstractDistributedNodeTest {
 				backupSize.put(addr, backupSize.get(addr)
 						+ jNode.getBackupSignals().get(addr).size());
 
-				// logger.log("=== Backup data for: " + addr + " - "
-				// + jNode.getBackupSignals().get(addr).size());
+				logger.log("=== Backup data for: " + addr + " - "
+						+ jNode.getBackupSignals().get(addr).size());
 			}
 		}
 

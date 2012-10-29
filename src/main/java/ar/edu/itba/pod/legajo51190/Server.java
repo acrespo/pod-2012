@@ -10,7 +10,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
-import ar.edu.itba.pod.legajo51190.impl.MultiThreadedSignalProcessor;
+import ar.edu.itba.pod.legajo51190.impl.MultiThreadedDistributedSignalProcessor;
 
 /**
  * Hello world!
@@ -64,7 +64,7 @@ public class Server {
 		try {
 			reg = LocateRegistry.createRegistry(port);
 
-			MultiThreadedSignalProcessor impl = new MultiThreadedSignalProcessor(
+			MultiThreadedDistributedSignalProcessor impl = new MultiThreadedDistributedSignalProcessor(
 					nthreads);
 			Remote proxy = UnicastRemoteObject.exportObject(impl, 0);
 

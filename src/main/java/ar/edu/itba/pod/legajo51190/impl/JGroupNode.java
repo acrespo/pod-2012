@@ -1,7 +1,6 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jgroups.Address;
@@ -12,11 +11,17 @@ import ar.edu.itba.pod.api.Signal;
 
 import com.google.common.collect.Multimap;
 
+/**
+ * Represents the internal structure of a JGroup for my implementation. It
+ * contains all the relevant data for the management of data inside a processor.
+ * 
+ * @author cris
+ */
 public interface JGroupNode {
 
-	public ConcurrentSkipListSet<String> getAliveNodeNames();
+	public Set<String> getAliveNodeNames();
 
-	public ConcurrentSkipListSet<Address> getAliveNodes();
+	public Set<Address> getAliveNodes();
 
 	public AtomicBoolean getIsDegraded();
 

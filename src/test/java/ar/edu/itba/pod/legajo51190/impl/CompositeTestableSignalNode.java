@@ -4,13 +4,12 @@ import java.rmi.RemoteException;
 
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
-import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 
 /**
  * SignalNode implementation for testing a SPNode and SignalProcessor Requires
- * the use of a {@link CountdownSyncListener} passed as parameter into the
+ * the use of a {@link SyncListener} passed as parameter into the
  * {@link SignalProcessor} in order to listen to the connection and
  * disconnection of a channel. Otherwise, join and exit methods MUST be
  * blocking.
@@ -20,14 +19,11 @@ import ar.edu.itba.pod.api.SignalProcessor;
  */
 public class CompositeTestableSignalNode implements SignalNode {
 
-	private final SPNode node;
-	private final SignalProcessor processor;
-	private final CountdownSyncListener injectedListener;
+	private final JGroupSignalProcessor processor;
+	private final SyncListener injectedListener;
 
-	public CompositeTestableSignalNode(final SPNode node,
-			final SignalProcessor processor,
-			final CountdownSyncListener injectedListener) {
-		this.node = node;
+	public CompositeTestableSignalNode(final JGroupSignalProcessor processor,
+			final SyncListener injectedListener) {
 		this.processor = processor;
 		this.injectedListener = injectedListener;
 	}
@@ -44,26 +40,26 @@ public class CompositeTestableSignalNode implements SignalNode {
 
 	@Override
 	public void join(final String clusterName) throws RemoteException {
-		node.join(clusterName);
+		processor.join(clusterName);
 	}
 
 	@Override
 	public void exit() throws RemoteException {
-		node.exit();
+		processor.exit();
 	}
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
-		return node.getStats();
+		return processor.getStats();
 	}
 
 	@Override
 	public JGroupNode getJGroupNode() {
-		return ((MultiThreadedSignalProcessor) processor).getJGroupNode();
+		return processor.getJGroupNode();
 	}
 
 	@Override
-	public CountdownSyncListener getInjectedListener() {
+	public SyncListener getInjectedListener() {
 		return injectedListener;
 	}
 }

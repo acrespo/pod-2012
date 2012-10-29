@@ -14,7 +14,7 @@ import org.jgroups.ChannelListener;
  * 
  * @author cris
  */
-public class CountdownSyncListener implements ChannelListener, NodeListener {
+public class SyncListener implements ChannelListener, NodeListener {
 
 	private CountDownLatch disconnectionLatch = null;
 	private CountDownLatch connectionLatch = null;

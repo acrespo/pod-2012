@@ -2,64 +2,62 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.jgroups.ChannelListener;
-import org.jgroups.JChannel;
 
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
-import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
-import ar.edu.itba.pod.api.SignalProcessor;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
-public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
-	private final Set<Signal> signals = Collections
-			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
-	private final Set<Signal> toDistributeSignals = Collections
-			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+/**
+ * SignalProcessor implementation
+ * 
+ * @author cris
+ */
+public class MultiThreadedDistributedSignalProcessor implements
+		JGroupSignalProcessor {
+
 	private final ListeningExecutorService localProcessingService;
 	private final int threads;
-	private final JChannel channel;
 	private final NodeReceiver networkState;
 	private final Node node;
+	@SuppressWarnings("unused")
 	private final NodeLogger nodeLogger;
 
-	public MultiThreadedSignalProcessor(final int threads) throws Exception {
+	public MultiThreadedDistributedSignalProcessor(final int threads)
+			throws Exception {
 		this(threads, null, null);
 	}
 
-	public MultiThreadedSignalProcessor(final int threads,
+	public MultiThreadedDistributedSignalProcessor(final int threads,
 			final Set<ChannelListener> listeners,
 			final NodeListener nodeListener) throws Exception {
 		this.threads = threads;
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
-		channel = new JChannel("udp-largecluster.xml");
-		node = new Node(signals, channel, toDistributeSignals, nodeListener);
+		node = new Node(nodeListener);
 		networkState = new NodeReceiver(node);
-		channel.setDiscardOwnMessages(true);
+		node.getChannel().setDiscardOwnMessages(true);
 
 		if (networkState != null) {
-			channel.setReceiver(networkState);
-			channel.addChannelListener(networkState);
+			node.getChannel().setReceiver(networkState);
+			node.getChannel().addChannelListener(networkState);
 		}
 
 		if (listeners != null) {
 			for (ChannelListener channelListener : listeners) {
-				channel.addChannelListener(channelListener);
+				node.getChannel().addChannelListener(channelListener);
 			}
 		}
 
@@ -69,7 +67,7 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 	@Override
 	public void join(final String clusterName) throws RemoteException {
 		try {
-			channel.connect(clusterName);
+			node.getChannel().connect(clusterName);
 		} catch (Exception e) {
 			throw new RemoteException(e.getMessage());
 		}
@@ -77,9 +75,13 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public void exit() throws RemoteException {
-		signals.clear();
-		toDistributeSignals.clear();
-		channel.close();
+		synchronized (node.getToDistributeSignals()) {
+			synchronized (node.getLocalSignals()) {
+				node.getLocalSignals().clear();
+				node.getToDistributeSignals().clear();
+				node.getChannel().close();
+			}
+		}
 	}
 
 	@Override
@@ -89,8 +91,8 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 	@Override
 	public void add(final Signal signal) throws RemoteException {
-		synchronized (toDistributeSignals) {
-			toDistributeSignals.add(signal);
+		synchronized (node.getToDistributeSignals()) {
+			node.getToDistributeSignals().add(signal);
 		}
 	}
 
@@ -105,10 +107,10 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 
 		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
 
-		synchronized (toDistributeSignals) {
-			synchronized (signals) {
-				querySignals.addAll(toDistributeSignals);
-				querySignals.addAll(signals);
+		synchronized (node.getToDistributeSignals()) {
+			synchronized (node.getLocalSignals()) {
+				querySignals.addAll(node.getToDistributeSignals());
+				querySignals.addAll(node.getLocalSignals());
 			}
 		}
 
@@ -133,8 +135,6 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 			}
 			t3 = System.currentTimeMillis();
 
-			// System.out.println("---- Multithreaded time: " + (t2 - t1));
-			// System.out.println("---- Join time: " + (t3 - t2));
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} catch (ExecutionException e) {
@@ -144,7 +144,8 @@ public class MultiThreadedSignalProcessor implements SignalProcessor, SPNode {
 		return result;
 	}
 
-	JGroupNode getJGroupNode() {
+	@Override
+	public JGroupNode getJGroupNode() {
 		return node;
 	}
 }

@@ -8,17 +8,16 @@ import org.jgroups.ChannelListener;
 public class MyDistributedNodeTest extends AbstractDistributedNodeTest {
 
 	@Override
-	public SignalNode createNewSignalNode(final CountdownSyncListener listener) {
+	public SignalNode createNewSignalNode(final SyncListener listener) {
 
 		Set<ChannelListener> listeners = new HashSet<>();
 
 		listeners.add(listener);
 
-		MultiThreadedSignalProcessor processor;
+		MultiThreadedDistributedSignalProcessor processor;
 		try {
-			processor = new MultiThreadedSignalProcessor(2, listeners, listener);
-			return new CompositeTestableSignalNode(processor, processor,
-					listener);
+			processor = new MultiThreadedDistributedSignalProcessor(2, listeners, listener);
+			return new CompositeTestableSignalNode(processor, listener);
 		} catch (Exception e) {
 			return null; // Critical error
 		}

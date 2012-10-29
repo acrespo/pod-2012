@@ -26,19 +26,45 @@ import com.google.common.collect.Sets;
 
 public class NodeUpdateService {
 
+	/**
+	 * Represents the addresses awaiting for response when a synchronization
+	 * action is done
+	 */
 	private final BlockingQueue<Address> waitingAddresses = new LinkedBlockingQueue<>();
-	private final ThreadPoolExecutor changeRequestService;
+	/**
+	 * Single thread pool, that handles all the incoming tasks and executes one
+	 * at a time.
+	 */
+	private final ThreadPoolExecutor nodeSyncService;
+	/**
+	 * Node to sync.
+	 */
 	private final Node node;
-	private CountDownLatch latch;
+	/**
+	 * Latch for awaiting the ACKs from the members of the group.
+	 */
+	private CountDownLatch ackLatch;
+	/**
+	 * Latch for awaiting the signal from new nodes to synchronize, needed to
+	 * have many incoming nodes at the same time without exploding
+	 */
 	private CountDownLatch awaitLatch;
+	/**
+	 * Timer that polls the "to distribute signals" for new elements in order to
+	 * send them.
+	 */
 	private final Timer dataUpdateTimer;
+	/**
+	 * The timer can only be activated then no new node is synchronizing so it
+	 * can be controlled with this.
+	 */
 	private final AtomicBoolean timerEnabled = new AtomicBoolean(true);
 	private final NodeLogger nodeLogger;
 
 	public NodeUpdateService(final Node node) {
 		this.node = node;
-		changeRequestService = new ThreadPoolExecutor(1, 1, 1,
-				TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>()) {
+		nodeSyncService = new ThreadPoolExecutor(1, 1, 1, TimeUnit.MINUTES,
+				new LinkedBlockingQueue<Runnable>()) {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
 				node.setDegraded(getQueue().isEmpty());
@@ -52,35 +78,37 @@ public class NodeUpdateService {
 		dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
 			@Override
 			public void run() {
-
 				try {
 
+					// If there is connection and the timer can work.
 					if (timerEnabled.get() && node.getChannel() != null
 							&& node.getChannel().isConnected()) {
-						final Set<Signal> signalsCopy = new HashSet<>();
 
+						// The copy of the signals to send must be isolated
+						final Set<Signal> signalsCopy = new HashSet<>();
 						synchronized (node.getToDistributeSignals()) {
 							signalsCopy.addAll(node.getToDistributeSignals());
 							node.getToDistributeSignals().clear();
 						}
+
 						if (signalsCopy.size() > 0) {
 
-							Set<Address> allMembersButMyself = new HashSet<>(
-									node.getAliveNodes());
-
+							// TODO: DRY this references if possible
+							List<Address> allMembersButMyself = Lists
+									.newArrayList(node.getAliveNodes());
 							allMembersButMyself.remove(node.getAddress());
 
+							// TODO: Take this out.
 							Multimap<Address, Signal> copyOfBackupSignals = null;
-
 							synchronized (node.getBackupSignals()) {
-								copyOfBackupSignals = HashMultimap.create(node
-										.getBackupSignals());
+								copyOfBackupSignals = HashMultimap.create();
 							}
 
 							nodeLogger.log("Updating my new nodes...");
 
+							// This synchronized might be a bit too much.
 							synchronized (node) {
-								syncNewMembers(
+								syncMembers(
 										Lists.newArrayList(allMembersButMyself),
 										Lists.newArrayList(node.getAliveNodes()),
 										signalsCopy, copyOfBackupSignals);
@@ -102,17 +130,16 @@ public class NodeUpdateService {
 	}
 
 	public void updateFromView(final View new_view) {
-		changeRequestService.submit(new Runnable() {
+		nodeSyncService.submit(new Runnable() {
 			@Override
 			public void run() {
 				try {
 					if (node.getLastView() != null) {
-
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
 						if (goneMembers.size() > 0) {
-							syncGoneMembers(goneMembers);
+							resolveGoneMembers(goneMembers);
 						}
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
@@ -130,10 +157,11 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
+							// This synchronized might be a bit too much.
 							synchronized (node) {
 								awaitLatch = new CountDownLatch(1);
 
-								syncNewMembers(Lists.newArrayList(newMembers),
+								syncMembers(Lists.newArrayList(newMembers),
 										new_view.getMembers(), signalsCopy,
 										copyOfBackupSignals);
 
@@ -158,13 +186,11 @@ public class NodeUpdateService {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-
 			}
-
 		});
 	}
 
-	private void syncNewMembers(final List<Address> newMembers,
+	private void syncMembers(final List<Address> newMembers,
 			final List<Address> allMembers, final Set<Signal> signalsCopy,
 			final Multimap<Address, Signal> backupMapCopy) {
 
@@ -172,6 +198,9 @@ public class NodeUpdateService {
 
 		Set<Signal> signalsToKeep = new HashSet<>();
 
+		// From all the signals we are going to send
+		// We distribute them 'evenly' across all members
+		// And we keep some and send some.
 		for (Signal signal : signalsCopy) {
 			Address addressToSendData = getAddressForSignal(signal, allMembers,
 					allMembers);
@@ -189,8 +218,15 @@ public class NodeUpdateService {
 
 		boolean copyMode = allMembers.size() - newMembers.size() == 1;
 
+		// If we're in copy mode we're gonna send twice as much of data,
+		// Because we need to send the copy from our data.
 		if (copyMode) {
+			// Since it can be a simple 'to myself' synchronization
+			// We need to check this.
 			if (allMembers.size() > 1) {
+				// From all the signals we have to keep
+				// We send a backup to all the members but ourselves.
+				// This way, for each signal we store, there is a backup.
 				for (Signal signal : signalsToKeep) {
 					Address addressToSendData = getAddressForSignal(signal,
 							allMembersButMe, allMembers);
@@ -198,6 +234,8 @@ public class NodeUpdateService {
 				}
 			}
 		} else {
+			// If we're not in copy mode we're only going to send
+			// data from our backups.
 			List<Address> newMembersAndMe = new ArrayList<>(newMembers);
 			newMembersAndMe.add(node.getAddress());
 			for (Address backupAddr : backupMapCopy.keySet()) {
@@ -206,84 +244,39 @@ public class NodeUpdateService {
 							allMembersButMe, allMembers);
 					if (!addressToSendData.equals(node.getAddress())
 							&& newMembersAndMe.contains(addressToSendData)) {
+						// TODO: Check if we're not sending data badly..
+						// Should we add !newMembersAndMe.contains(backupAddr) ?
 						backupSignalsToSend.put(backupAddr, sign);
 					}
 				}
-				// nodeLogger.logAcum("Sending: "
-				// + backupSignalsToSend.get(backupAddr).size()
-				// + " nodes from " + backupAddr);
 			}
 
 		}
-		//
-		// nodeLogger.logAcum("Sending my " + signalsToSend.size());
-		// nodeLogger.logAcum("Sending backups total "
-		// + backupSignalsToSend.size());
-		// nodeLogger.logAcum("Keeping " + signalsToKeep.size() +
-		// " for myself");
-		// nodeLogger.logAcum("I considered I had " + allMembers.size()
-		// + " members in cluster and " + newMembers.size());
-		//
-		// nodeLogger.flush();
 
+		// We send the signals to the group members
 		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
 				copyMode, allMembersButMe, allMembers);
+
+		// We save the signals in a locked action.
+		safelySaveSignals(signalsToSend, signalsToKeep, backupSignalsToSend);
 	}
 
-	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
+	/**
+	 * Save signals in a transaction, must be done after all ACKs are received
+	 * TODO: Improve and dont do when not all are received
+	 * 
+	 * @param signalsToSend
+	 *            Signals that will be send as data to store to the new nodes /
+	 *            or members
+	 * @param signalsToKeep
+	 *            Signals that will instead be kept as local data.
+	 * @param backupSignalsToSend
+	 *            Backup signals that will be shared to the new nodes
+	 */
+	private void safelySaveSignals(
 			final Multimap<Address, Signal> signalsToSend,
-			final Multimap<Address, Signal> backupSignalsToSend,
-			final boolean copyMode, final List<Address> receptors,
-			final List<Address> allMembers) {
-
-		latch = new CountDownLatch(receptors.size());
-
-		try {
-
-			for (Address receptor : receptors) {
-				Message msg = new Message(receptor, new GlobalSyncNodeMessage(
-						signalsToSend, backupSignalsToSend, copyMode,
-						allMembers));
-				node.getChannel().send(msg);
-			}
-
-			for (Address addr : signalsToSend.keySet()) {
-				if (!addr.equals(node.getAddress())) {
-					if (copyMode) {
-						node.getBackupSignals().putAll(addr,
-								signalsToSend.get(addr));
-					}
-				}
-			}
-			waitingAddresses.addAll(receptors);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		try {
-			if (!latch.await(5, TimeUnit.SECONDS)) {
-				throw new Exception("JA!!!");
-			}
-		} catch (Exception e) {
-			for (Address address : waitingAddresses) {
-				System.out.println("Sending to " + address);
-				new Message(address, new GlobalSyncNodeMessage(signalsToSend,
-						backupSignalsToSend, copyMode, allMembers));
-			}
-
-			latch = new CountDownLatch(waitingAddresses.size());
-
-			try {
-				if (!latch.await(5, TimeUnit.SECONDS)) {
-					throw new Exception("JA!!!");
-				}
-			} catch (Exception e1) {
-				e1.printStackTrace();
-			}
-
-		}
-
+			final Set<Signal> signalsToKeep,
+			final Multimap<Address, Signal> backupSignalsToSend) {
 		synchronized (node.getLocalSignals()) {
 			synchronized (node.getBackupSignals()) {
 				for (Address addr : signalsToSend.keySet()) {
@@ -300,13 +293,104 @@ public class NodeUpdateService {
 				}
 
 				node.getLocalSignals().addAll(signalsToKeep);
-				// syncGoneMembers(new HashSet<Address>(waitingAddresses));
 			}
 		}
-
 	}
 
-	private void syncGoneMembers(final Set<Address> goneMembers) {
+	/**
+	 * Sends the signals to the members of the group.
+	 */
+	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
+			final Multimap<Address, Signal> signalsToSend,
+			final Multimap<Address, Signal> backupSignalsToSend,
+			final boolean copyMode, final List<Address> receptors,
+			final List<Address> allMembers) {
+
+		// Must be started before any message is sent, we don't want unexpected
+		// countdowns :)
+		ackLatch = new CountDownLatch(receptors.size());
+
+		try {
+
+			for (Address receptor : receptors) {
+				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
+						copyMode, allMembers, receptor);
+			}
+
+			// If we're on copy mode, we save all the data we sent as backup
+			// It's logical isn't it?
+			if (copyMode) {
+				for (Address addr : signalsToSend.keySet()) {
+					if (!addr.equals(node.getAddress())) {
+
+						node.getBackupSignals().putAll(addr,
+								signalsToSend.get(addr));
+
+					}
+				}
+			}
+			waitingAddresses.addAll(receptors);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		handleTimeouts(signalsToSend, backupSignalsToSend, copyMode, allMembers);
+	}
+
+	private void handleTimeouts(final Multimap<Address, Signal> signalsToSend,
+			final Multimap<Address, Signal> backupSignalsToSend,
+			final boolean copyMode, final List<Address> allMembers) {
+		try {
+			if (!ackLatch.await(5, TimeUnit.SECONDS)) {
+				throw new Exception("First timeout");
+			}
+		} catch (Exception e) {
+			for (Address address : waitingAddresses) {
+				System.out.println("Sending to " + address);
+				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
+						copyMode, allMembers, address);
+			}
+
+			ackLatch = new CountDownLatch(waitingAddresses.size());
+
+			try {
+				if (!ackLatch.await(5, TimeUnit.SECONDS)) {
+					throw new Exception(
+							"Second timeout, some nodes are not answering");
+				}
+			} catch (Exception e1) {
+				// TODO: Handle this.
+				e1.printStackTrace();
+			}
+
+		}
+	}
+
+	/**
+	 * Handler to send messages
+	 */
+	private void sendSyncMessageToAddress(
+			final Multimap<Address, Signal> signalsToSend,
+			final Multimap<Address, Signal> backupSignalsToSend,
+			final boolean copyMode, final List<Address> allMembers,
+			final Address address) {
+		try {
+			node.getChannel().send(
+					new Message(address, new GlobalSyncNodeMessage(
+							signalsToSend, backupSignalsToSend, copyMode,
+							allMembers)));
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
+	}
+
+	/**
+	 * Recovers the backups from the fallen nodes. If more than one member is
+	 * gone we cannot guarantee the recovery of all messages.
+	 * 
+	 * TODO: Implements this well.
+	 */
+	private void resolveGoneMembers(final Set<Address> goneMembers) {
 		if (goneMembers.size() > 1) {
 			nodeLogger
 					.log("More than one member is gone, we might have lost messages :(");
@@ -349,9 +433,14 @@ public class NodeUpdateService {
 		return newMembers;
 	}
 
-	// private static final Random r = new Random();
-
-	Address getAddressForSignal(final Signal sig,
+	/**
+	 * Assigns a node to a signal, given a set of nodes to consider, and all the
+	 * nodes of the group. It's very important that the set of nodes is the same
+	 * for each distribution of the nodes. If that condition is not met the
+	 * assignment will be erroneous and the data will be spread badly.
+	 * Consistency and synchronization on this method is very important
+	 */
+	public Address getAddressForSignal(final Signal sig,
 			final List<Address> membersToPutIn, final List<Address> allMembers) {
 		int size = membersToPutIn.size();
 		int allMembersSize = allMembers.size();
@@ -359,11 +448,20 @@ public class NodeUpdateService {
 		return membersToPutIn.get(index);
 	}
 
+	/**
+	 * ACK of the synchronization of a member, if it's not received then we
+	 * retry, if not, we must handle the error.
+	 */
 	public void notifyNodeAnswer(final GlobalSyncNodeMessageAnswer message) {
 		waitingAddresses.remove(message.getOwner());
-		latch.countDown();
+		ackLatch.countDown();
 	}
 
+	/**
+	 * Notification for when a new node is ready and has all it's copies. No
+	 * other synchronization action can be taken before this message is
+	 * received, otherwise things get nasty.
+	 */
 	public void notifyNewNodeReady() {
 		if (awaitLatch != null) {
 			awaitLatch.countDown();

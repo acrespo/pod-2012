@@ -1,6 +1,8 @@
 package ar.edu.itba.pod.legajo51190.impl;
 
+import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -8,6 +10,7 @@ import javax.annotation.Nullable;
 
 import org.jgroups.Address;
 import org.jgroups.Channel;
+import org.jgroups.JChannel;
 import org.jgroups.View;
 
 import ar.edu.itba.pod.api.NodeStats;
@@ -21,23 +24,21 @@ import com.google.common.collect.Multimaps;
 
 public class Node implements JGroupNode {
 	private final Multimap<Address, Signal> backupSignals;
-	private ConcurrentSkipListSet<Address> aliveNodes;
-	private ConcurrentSkipListSet<String> aliveNodeNames;
+	private Set<Address> aliveNodes;
+	private Set<String> aliveNodeNames;
 	private View lastView;
 	private Address nodeAddress;
 	private final AtomicBoolean isDegraded = new AtomicBoolean(false);
-	private final Set<Signal> signals;
-	private final Set<Signal> toDistributeSignals;
-
+	private final Set<Signal> signals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+	private final Set<Signal> toDistributeSignals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final Channel channel;
 	private final NodeListener listener;
 
-	public Node(final Set<Signal> signals, final Channel channel,
-			final Set<Signal> toDistributeSignals, final NodeListener listener) {
+	public Node(final NodeListener listener) throws Exception {
 		super();
-		this.signals = signals;
-		this.channel = channel;
-		this.toDistributeSignals = toDistributeSignals;
+		channel = new JChannel("udp-largecluster.xml");
 		this.listener = listener;
 		Multimap<Address, Signal> sig = HashMultimap.create();
 		backupSignals = Multimaps.synchronizedMultimap(sig);
@@ -49,12 +50,12 @@ public class Node implements JGroupNode {
 	}
 
 	@Override
-	public ConcurrentSkipListSet<String> getAliveNodeNames() {
+	public Set<String> getAliveNodeNames() {
 		return aliveNodeNames;
 	}
 
 	@Override
-	public ConcurrentSkipListSet<Address> getAliveNodes() {
+	public Set<Address> getAliveNodes() {
 		return aliveNodes;
 	}
 
@@ -115,6 +116,7 @@ public class Node implements JGroupNode {
 				backupSignals.size(), false);
 	}
 
+	@Override
 	public NodeListener getListener() {
 		return listener;
 	}

@@ -9,6 +9,11 @@ import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
 import ar.edu.itba.pod.api.Signal;
 
+/**
+ * Callable for making a search inside a processor.
+ * 
+ * @author cris
+ */
 public class LocalSearchCall implements Callable<List<Result.Item>> {
 
 	private final BlockingQueue<Signal> querySignals;
