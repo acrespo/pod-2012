@@ -43,10 +43,14 @@ public class MyImplVsStandardImplTest extends SideBySideTester {
 			});
 			controller.addNewNodes(5);
 		} else {
-			controller.disconnectAllNodesFromChannel();
-			controller.getNodesToTest().clear();
 			controller.addNewNodes(5);
 		}
 		return controller.getNodesToTest().getFirst();
+	}
+
+	@Override
+	protected void clear() {
+		controller.disconnectAllNodesFromChannel();
+		controller.getNodesToTest().clear();
 	}
 }

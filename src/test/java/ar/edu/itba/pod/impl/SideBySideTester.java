@@ -12,6 +12,7 @@ import static org.junit.Assert.assertEquals;
 import java.rmi.RemoteException;
 import java.util.Arrays;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,10 +41,17 @@ public abstract class SideBySideTester {
 		src = new RandomSource(12345);
 	}
 
+	@After
+	public void disconnect() throws Exception {
+		clear();
+	}
+
 	/**
 	 * Initialize or get a reference to the signal processor to be tested.
 	 */
 	abstract protected SignalProcessor init() throws Exception;
+
+	abstract protected void clear() throws Exception;
 
 	@Test
 	public void test01() throws RemoteException {

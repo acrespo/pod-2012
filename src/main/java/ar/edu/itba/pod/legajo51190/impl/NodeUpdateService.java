@@ -394,15 +394,18 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers,
 			final Address address) {
-		if (node.isOnline()) {
 
+		// TODO: ask how to improve this if we can
+		if (node.isOnline()) {
 			try {
 				node.getChannel().send(
 						new Message(address, new GlobalSyncNodeMessage(
 								signalsToSend, backupSignalsToSend, copyMode,
 								allMembers)));
 			} catch (Exception e1) {
-				e1.printStackTrace();
+				if (node.isOnline()) {
+					e1.printStackTrace();
+				}
 			}
 
 		}
