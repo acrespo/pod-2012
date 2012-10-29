@@ -401,10 +401,12 @@ public class NodeUpdateService {
 					nodeLogger.log("Recovering backups from "
 							+ address.toString() + " size: "
 							+ node.getBackupSignals().get(address).size());
-					node.getLocalSignals().addAll(
+					node.getToDistributeSignals().addAll(
 							node.getBackupSignals().get(address));
-					node.getBackupSignals().removeAll(address);
 				}
+				node.getToDistributeSignals().addAll(node.getLocalSignals());
+				node.getBackupSignals().clear();
+				node.getLocalSignals().clear();
 			}
 		}
 	}

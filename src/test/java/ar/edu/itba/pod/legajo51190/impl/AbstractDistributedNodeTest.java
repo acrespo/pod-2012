@@ -14,7 +14,6 @@ import junit.framework.Assert;
 
 import org.jgroups.Address;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.signal.source.RandomSource;
@@ -38,8 +37,7 @@ public abstract class AbstractDistributedNodeTest {
 		src = new RandomSource(12345);
 	}
 
-	public abstract SignalNode createNewSignalNode(
-			SyncListener listener);
+	public abstract SignalNode createNewSignalNode(SyncListener listener);
 
 	/**
 	 * Must disconnect all processors and block until it's done.
@@ -224,18 +222,26 @@ public abstract class AbstractDistributedNodeTest {
 			e1.printStackTrace();
 		}
 
-		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
-				nodesToTest.size());
-
-		listener.setNewNodeLatch(newNodeAwaitLatch);
-
 		try {
-			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
-				throw new InterruptedException();
-			}
+			Thread.sleep(1000);
 		} catch (InterruptedException e) {
-			// throw new RuntimeException("Something didn't sync right");
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
+
+		// CountDownLatch newNodeAwaitLatch = new CountDownLatch(
+		// nodesToTest.size());
+		//
+		// listener.setNewNodeLatch(newNodeAwaitLatch);
+		//
+		// try {
+		// if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
+		// throw new InterruptedException();
+		// }
+		// } catch (InterruptedException e) {
+		// e.printStackTrace();
+		// // throw new RuntimeException("Something didn't sync right");
+		// }
 	}
 
 	/**
@@ -285,7 +291,7 @@ public abstract class AbstractDistributedNodeTest {
 
 			NodeLogger logger = new NodeLogger(jNode);
 
-			logger.setEnabled(false);
+			// logger.setEnabled(false);
 
 			logger.log("=== Local data: " + jNode.getLocalSignals().size());
 
@@ -302,12 +308,16 @@ public abstract class AbstractDistributedNodeTest {
 			}
 		}
 
-		for (Address addr : localSize.keySet()) {
-			Assert.assertEquals(localSize.get(addr), backupSize.get(addr));
-		}
+		if (nodesToTest.size() > 1) {
+			for (Address addr : localSize.keySet()) {
+				Assert.assertEquals(localSize.get(addr), backupSize.get(addr));
+			}
 
-		Assert.assertEquals(stored, sumStored);
-		Assert.assertEquals(stored, sumBackuped);
+			Assert.assertEquals(stored, sumStored);
+			Assert.assertEquals(stored, sumBackuped);
+		} else {
+			Assert.assertEquals(stored, sumStored);
+		}
 
 	}
 
@@ -448,22 +458,59 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
-	@Ignore
-	public void synchronizeDoLotsOfStuffAndDeleteNode()
+	public void synchronizeData5MembersAndAdd21600Signals()
 			throws InterruptedException, IOException {
-		synchronizeData1Member1Member1Member();
+		synchronizeData1Member5Members();
 
-		addSignalsToNode(nodesToTest.getLast(), 2400);
+		addSignalsToNode(nodesToTest.getLast(), 21600);
 
-		Thread.sleep(5000);
+		assertTotalAmountIs(24000);
+	}
 
-		assertTotalAmountIs(4800);
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeData1Member1Delete() throws InterruptedException,
+			IOException {
+		synchronizeData1Member();
+
+		removeNode(nodesToTest.getFirst());
+
+		assertTotalAmountIs(2400);
+	}
+
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeData1Member1Member1Delete()
+			throws InterruptedException, IOException {
+		synchronizeData1Member1Member();
+
+		removeNode(nodesToTest.getFirst());
+
+		assertTotalAmountIs(2400);
+	}
+
+	/**
+	 * 2 node join a channel with two nodes syncd.
+	 * 
+	 * @throws IOException
+	 */
+	@Test
+	public void synchronizeLotsOfMembersAndDelete1()
+			throws InterruptedException, IOException {
+		synchronizeData5MembersAndAdd21600Signals();
 
 		removeNode(nodesToTest.getFirst());
 
 		Thread.sleep(5000);
 
-		assertTotalAmountIs(4800);
+		assertTotalAmountIs(24000);
 	}
-
 }
