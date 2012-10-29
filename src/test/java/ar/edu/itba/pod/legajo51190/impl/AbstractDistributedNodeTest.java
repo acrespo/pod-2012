@@ -14,6 +14,7 @@ import junit.framework.Assert;
 
 import org.jgroups.Address;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.signal.source.RandomSource;
@@ -445,6 +446,7 @@ public abstract class AbstractDistributedNodeTest {
 	 * @throws IOException
 	 */
 	@Test
+	@Ignore
 	public void synchronizeDoLotsOfStuffAndDeleteNode()
 			throws InterruptedException, IOException {
 		synchronizeData1Member1Member1Member();
