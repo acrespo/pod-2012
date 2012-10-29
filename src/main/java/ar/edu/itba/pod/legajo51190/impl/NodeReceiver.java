@@ -7,6 +7,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jgroups.Address;
 import org.jgroups.Channel;
@@ -24,8 +26,9 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private final Node node;
 	private final BlockingQueue<Callable<Void>> connectionPendingTasks;
 	private final ExecutorService connectionService;
-	private final ExecutorService workerService;
 	private final NodeLogger nodeLogger;
+	private final AtomicInteger newNodePartsCount = new AtomicInteger(0);
+	private final AtomicBoolean isNewNode = new AtomicBoolean(true);
 
 	public NodeReceiver(final Node node) {
 		this.node = node;
@@ -33,7 +36,6 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		connectionService = Executors.newCachedThreadPool();
 		connectionPendingTasks = new LinkedBlockingQueue<>();
 		nodeLogger = new NodeLogger(node);
-		workerService = Executors.newSingleThreadExecutor();
 	}
 
 	@Override
@@ -51,27 +53,16 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
 			if (node.getChannel().isConnected()) {
-				workerService.submit(new Runnable() {
-					@Override
-					public void run() {
-						onNewNodeSync(msg,
-								(GlobalSyncNodeMessage) msg.getObject());
-					}
-				});
+				onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
+
 			} else {
 				connectionPendingTasks.add(new Callable<Void>() {
 					@Override
 					public Void call() {
 						try {
-							workerService.submit(new Runnable() {
 
-								@Override
-								public void run() {
-									onNewNodeSync(msg,
-											(GlobalSyncNodeMessage) msg
-													.getObject());
-								}
-							});
+							onNewNodeSync(msg,
+									(GlobalSyncNodeMessage) msg.getObject());
 
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -83,6 +74,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessageAnswer) {
 			onNewNodeSyncAnswer((GlobalSyncNodeMessageAnswer) msg.getObject());
+		} else if (msg.getObject() instanceof NewNodeReadyMessage) {
+			updateService.notifyNewNodeReady();
 		}
 	}
 
@@ -163,21 +156,20 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		reply.setObject(new GlobalSyncNodeMessageAnswer(node.getAddress()));
 		sendSafeAnswer(reply);
 
-		// if (message.getDestinations().contains(node.getAddress())) {
-		nodeLogger.log("I got message from " + msg.getSrc());
-		// }
-		// if (message.isCopyMode()) {
-		// nodeLogger.log("I received " + node.getBackupSignals().size()
-		// + " COPY signals");
-		// } else {
-		// nodeLogger.logAcum("I have " + node.getLocalSignals().size()
-		// + " signals");
-		// if (!message.isCopyMode()) {
-		// nodeLogger.logAcum("I got total " + node.getBackupSignals().size()
-		// + " from " + msg.getSrc());
-		// }
+		if (isNewNode.get()) {
+			newNodePartsCount.addAndGet(1);
+
+			if (newNodePartsCount.get() == message.getAllMembers().size()
+					- message.getDestinations().size()) {
+				final Message newNodeReply = new Message(null);
+				newNodeReply.setObject(new NewNodeReadyMessage());
+				sendSafeAnswer(newNodeReply);
+				nodeLogger.logAcum("Sending data answer");
+				isNewNode.set(true);
+			}
+		}
 		nodeLogger.flush();
-		// }
+
 	}
 
 	private void sendSafeAnswer(final Message reply) {

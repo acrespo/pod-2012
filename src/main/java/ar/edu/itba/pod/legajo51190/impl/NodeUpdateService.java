@@ -22,6 +22,7 @@ import ar.edu.itba.pod.api.Signal;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 public class NodeUpdateService {
 
@@ -29,6 +30,7 @@ public class NodeUpdateService {
 	private final ThreadPoolExecutor changeRequestService;
 	private final Node node;
 	private CountDownLatch latch;
+	private CountDownLatch awaitLatch;
 	private final Timer dataUpdateTimer;
 	private final AtomicBoolean timerEnabled = new AtomicBoolean(true);
 	private final NodeLogger nodeLogger;
@@ -129,15 +131,26 @@ public class NodeUpdateService {
 							}
 
 							synchronized (node) {
+								awaitLatch = new CountDownLatch(1);
+
 								syncNewMembers(Lists.newArrayList(newMembers),
 										new_view.getMembers(), signalsCopy,
 										copyOfBackupSignals);
+
+								if (!awaitLatch.await(3000,
+										TimeUnit.MILLISECONDS)) {
+									nodeLogger.log("TIMEOUTED!!!");
+								} else {
+									nodeLogger.log("New node sync call for "
+											+ newMembers.toString());
+								}
+
 							}
 
-							nodeLogger.log("Updated!");
 							if (node.getListener() != null) {
 								node.getListener().onNodeSyncDone();
 							}
+
 						}
 
 					}
@@ -196,21 +209,22 @@ public class NodeUpdateService {
 						backupSignalsToSend.put(backupAddr, sign);
 					}
 				}
-				nodeLogger.logAcum("Sending: "
-						+ backupSignalsToSend.get(backupAddr).size()
-						+ " nodes from " + backupAddr);
+				// nodeLogger.logAcum("Sending: "
+				// + backupSignalsToSend.get(backupAddr).size()
+				// + " nodes from " + backupAddr);
 			}
 
 		}
-
-		nodeLogger.logAcum("Sending my " + signalsToSend.size());
-		nodeLogger.logAcum("Sending backups total "
-				+ backupSignalsToSend.size());
-		nodeLogger.logAcum("Keeping " + signalsToKeep.size() + " for myself");
-		nodeLogger.logAcum("I considered I had " + allMembers.size()
-				+ " members in cluster and " + newMembers.size());
-
-		nodeLogger.flush();
+		//
+		// nodeLogger.logAcum("Sending my " + signalsToSend.size());
+		// nodeLogger.logAcum("Sending backups total "
+		// + backupSignalsToSend.size());
+		// nodeLogger.logAcum("Keeping " + signalsToKeep.size() +
+		// " for myself");
+		// nodeLogger.logAcum("I considered I had " + allMembers.size()
+		// + " members in cluster and " + newMembers.size());
+		//
+		// nodeLogger.flush();
 
 		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
 				copyMode, allMembersButMe, allMembers);
@@ -276,7 +290,10 @@ public class NodeUpdateService {
 					node.getLocalSignals().removeAll(signalsToSend.get(addr));
 				}
 
-				for (Address addr : node.getBackupSignals().keySet()) {
+				Set<Address> addresses = Sets.newHashSet(node
+						.getBackupSignals().keySet());
+
+				for (Address addr : addresses) {
 					for (Signal signal : backupSignalsToSend.get(addr)) {
 						node.getBackupSignals().remove(addr, signal);
 					}
@@ -345,5 +362,11 @@ public class NodeUpdateService {
 	public void notifyNodeAnswer(final GlobalSyncNodeMessageAnswer message) {
 		waitingAddresses.remove(message.getOwner());
 		latch.countDown();
+	}
+
+	public void notifyNewNodeReady() {
+		if (awaitLatch != null) {
+			awaitLatch.countDown();
+		}
 	}
 }

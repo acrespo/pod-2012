@@ -52,6 +52,7 @@ public class CountdownSyncListener implements ChannelListener, NodeListener {
 		if (newNodeLatch != null) {
 			newNodeLatch.countDown();
 		}
+		System.out.println("Done countdown!");
 	}
 
 	public void setNewNodeLatch(final CountDownLatch newNodeLatch) {
