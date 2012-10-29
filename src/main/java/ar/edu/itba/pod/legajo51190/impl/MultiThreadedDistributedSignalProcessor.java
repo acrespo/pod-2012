@@ -15,7 +15,9 @@ import org.jgroups.ChannelListener;
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
+import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
+import ar.edu.itba.pod.api.SignalProcessor;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -26,7 +28,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  * @author cris
  */
 public class MultiThreadedDistributedSignalProcessor implements
-		JGroupSignalProcessor {
+		JGroupSignalProcessor, SignalProcessor, SPNode {
 
 	private final ListeningExecutorService localProcessingService;
 	private final int threads;

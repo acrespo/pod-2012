@@ -10,6 +10,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
+import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.legajo51190.impl.MultiThreadedDistributedSignalProcessor;
 
 /**
@@ -64,8 +65,7 @@ public class Server {
 		try {
 			reg = LocateRegistry.createRegistry(port);
 
-			MultiThreadedDistributedSignalProcessor impl = new MultiThreadedDistributedSignalProcessor(
-					nthreads);
+			SPNode impl = new MultiThreadedDistributedSignalProcessor(nthreads);
 			Remote proxy = UnicastRemoteObject.exportObject(impl, 0);
 
 			reg.bind("SignalProcessor", proxy);
