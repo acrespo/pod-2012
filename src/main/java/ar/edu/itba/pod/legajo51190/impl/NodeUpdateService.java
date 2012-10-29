@@ -266,12 +266,16 @@ public class NodeUpdateService {
 
 		}
 
-		// We send the signals to the group members
-		sendSignalsToMembers(signalsToKeep, signalsToSend, backupSignalsToSend,
-				copyMode, allMembersButMe, allMembers);
+		if (node.isOnline()) {
+			// We send the signals to the group members
+			sendSignalsToMembers(signalsToKeep, signalsToSend,
+					backupSignalsToSend, copyMode, allMembersButMe, allMembers);
+		}
 
-		// We save the signals in a locked action.
-		safelySaveSignals(signalsToSend, signalsToKeep, backupSignalsToSend);
+		if (node.isOnline()) {
+			// We save the signals in a locked action.
+			safelySaveSignals(signalsToSend, signalsToKeep, backupSignalsToSend);
+		}
 	}
 
 	/**
@@ -359,21 +363,24 @@ public class NodeUpdateService {
 			}
 		} catch (Exception e) {
 			for (Address address : waitingAddresses) {
-				System.out.println("Sending to " + address);
-				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
-						copyMode, allMembers, address);
+				if (node.isOnline()) {
+					sendSyncMessageToAddress(signalsToSend,
+							backupSignalsToSend, copyMode, allMembers, address);
+				}
 			}
 
-			ackLatch = new CountDownLatch(waitingAddresses.size());
+			if (node.isOnline()) {
+				ackLatch = new CountDownLatch(waitingAddresses.size());
 
-			try {
-				if (!ackLatch.await(5, TimeUnit.SECONDS)) {
-					throw new Exception(
-							"Second timeout, some nodes are not answering");
+				try {
+					if (!ackLatch.await(5, TimeUnit.SECONDS)) {
+						throw new Exception(
+								"Second timeout, some nodes are not answering");
+					}
+				} catch (Exception e1) {
+					// TODO: Handle this.
+					e1.printStackTrace();
 				}
-			} catch (Exception e1) {
-				// TODO: Handle this.
-				e1.printStackTrace();
 			}
 
 		}
@@ -387,7 +394,8 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers,
 			final Address address) {
-		if (node.getChannel().isConnected() && node.getChannel().isOpen()) {
+		if (node.isOnline()) {
+
 			try {
 				node.getChannel().send(
 						new Message(address, new GlobalSyncNodeMessage(
@@ -396,6 +404,7 @@ public class NodeUpdateService {
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
+
 		}
 	}
 
@@ -450,7 +459,9 @@ public class NodeUpdateService {
 			syncMembers(allMembersButMyself, view.getMembers(), signalsCopy,
 					copyOfBackupSignals);
 
-			tellOtherNodesImDoneRedistributingData();
+			if (node.isOnline()) {
+				tellOtherNodesImDoneRedistributingData();
+			}
 
 			try {
 				memberGoneLatch.await(3000, TimeUnit.MILLISECONDS);
@@ -467,6 +478,7 @@ public class NodeUpdateService {
 	}
 
 	private void tellOtherNodesImDoneRedistributingData() {
+
 		Message tellImDone = new Message(null, new GoneMessageSentNodeMessage());
 
 		try {
