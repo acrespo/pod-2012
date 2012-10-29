@@ -159,8 +159,6 @@ public abstract class AbstractDistributedNodeTest {
 
 		controller.addNewNodes(2);
 
-		Thread.sleep(10000);
-
 		assertNodeStoreIsNotEmpty(controller.getNodesToTest().getFirst());
 		assertNodeStoreIsNotEmpty(controller.getNodesToTest().get(1));
 		assertNodeStoreIsNotEmpty(controller.getNodesToTest().getLast());
@@ -196,8 +194,6 @@ public abstract class AbstractDistributedNodeTest {
 		synchronizeData1Member();
 
 		controller.addNewNodes(5);
-
-		Thread.sleep(10000);
 
 		// assertNodeIsNotEmpty(controller.getNodesToTest().getFirst());
 		// assertNodeIsNotEmpty(controller.getNodesToTest().get(2));
@@ -241,6 +237,7 @@ public abstract class AbstractDistributedNodeTest {
 		controller.addSignalsToNode(controller.getNodesToTest().getLast(),
 				21600);
 
+		System.out.println("===== ASSERTING");
 		assertNodeIsNotEmpty(controller.getNodesToTest().getFirst());
 		assertNodeIsNotEmpty(controller.getNodesToTest().get(1));
 		assertNodeIsNotEmpty(controller.getNodesToTest().get(2));
@@ -305,8 +302,6 @@ public abstract class AbstractDistributedNodeTest {
 		synchronizeData5MembersAndAdd21600Signals();
 
 		controller.removeNode(controller.getNodesToTest().getFirst());
-
-		Thread.sleep(5000);
 
 		assertTotalAmountIs(24000);
 	}

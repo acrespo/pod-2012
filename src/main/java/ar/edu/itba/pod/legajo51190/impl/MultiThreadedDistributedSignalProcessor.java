@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,6 +32,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		JGroupSignalProcessor, SignalProcessor, SPNode {
 
 	private final ListeningExecutorService localProcessingService;
+	private final ExecutorService remoteProcessingService;
 	private final int threads;
 	private final NodeReceiver networkState;
 	private final Node node;
@@ -45,6 +47,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 	public MultiThreadedDistributedSignalProcessor(final int threads,
 			final Set<ChannelListener> listeners,
 			final NodeListener nodeListener) throws Exception {
+		remoteProcessingService = Executors.newCachedThreadPool();
 		this.threads = threads;
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
@@ -98,7 +101,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 		}
 	}
 
-	@SuppressWarnings("unused")
 	@Override
 	public Result findSimilarTo(final Signal signal) throws RemoteException {
 		if (signal == null) {
@@ -107,35 +109,22 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		Result result = new Result(signal);
 
-		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
-
-		synchronized (node.getToDistributeSignals()) {
-			synchronized (node.getLocalSignals()) {
-				querySignals.addAll(node.getToDistributeSignals());
-				querySignals.addAll(node.getLocalSignals());
-			}
-		}
+		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 
 		List<LocalSearchCall> queries = new ArrayList<>();
-
 		for (int i = 0; i < threads; i++) {
 			queries.add(new LocalSearchCall(querySignals, signal));
 		}
 
-		long t1, t2, t3;
-
 		try {
-			t1 = System.currentTimeMillis();
 			List<Future<List<Item>>> results = localProcessingService
 					.invokeAll(queries);
-			t2 = System.currentTimeMillis();
 
 			for (Future<List<Item>> future : results) {
 				for (Item item : future.get()) {
 					result = result.include(item);
 				}
 			}
-			t3 = System.currentTimeMillis();
 
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -144,6 +133,18 @@ public class MultiThreadedDistributedSignalProcessor implements
 		}
 
 		return result;
+	}
+
+	private BlockingQueue<Signal> buildQuerySignalSet() {
+		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
+
+		synchronized (node.getToDistributeSignals()) {
+			synchronized (node.getLocalSignals()) {
+				querySignals.addAll(node.getToDistributeSignals());
+				querySignals.addAll(node.getLocalSignals());
+			}
+		}
+		return querySignals;
 	}
 
 	@Override

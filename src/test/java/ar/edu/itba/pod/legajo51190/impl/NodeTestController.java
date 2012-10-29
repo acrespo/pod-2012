@@ -87,6 +87,21 @@ public class NodeTestController {
 
 		getListener().setConnectionLatch(controlLatch);
 
+		int sum = 0;
+
+		for (int i = nodesToTest.size(); i < nodes.size() + nodesToTest.size(); i++) {
+			sum += i;
+		}
+
+		if (nodesToTest.size() == 0) {
+			sum = 0;
+		}
+
+		System.out.println("Awaiting for " + sum);
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(sum);
+
+		getListener().setNewNodeLatch(newNodeAwaitLatch);
+
 		for (SignalNode node : nodes) {
 			try {
 				isBlocking = node.getInjectedListener() == null
@@ -107,19 +122,10 @@ public class NodeTestController {
 				throw new RuntimeException("Something didn't sync right");
 			}
 		}
-		//
-		// System.out.println("Nodes to test: " + nodesToTest.size() +
-		// " nodes");
-		// System.out.println("Awaiting for: " + nodes.size() *
-		// nodesToTest.size()
-		// + " nodes");
-		CountDownLatch newNodeAwaitLatch = new CountDownLatch(
-				nodes.size() == 0 ? 0 : getNodesToTest().size());
-
-		getListener().setNewNodeLatch(newNodeAwaitLatch);
 
 		try {
 			if (!newNodeAwaitLatch.await(15, TimeUnit.SECONDS)) {
+				System.out.println("I GOT " + newNodeAwaitLatch.getCount());
 				throw new InterruptedException();
 			}
 		} catch (InterruptedException e) {
@@ -141,6 +147,10 @@ public class NodeTestController {
 		System.out.println("===== Adding " + amountOfSignals + " signals to "
 				+ node.getJGroupNode().getAddress());
 
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
+
+		getListener().setNewNodeLatch(newNodeAwaitLatch);
+
 		for (int i = 0; i < amountOfSignals; i++) {
 			try {
 				node.add(src.next());
@@ -148,10 +158,6 @@ public class NodeTestController {
 				e.printStackTrace();
 			}
 		}
-
-		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
-
-		getListener().setNewNodeLatch(newNodeAwaitLatch);
 
 		try {
 			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
@@ -192,13 +198,6 @@ public class NodeTestController {
 			n.exit();
 		} catch (RemoteException e1) {
 			e1.printStackTrace();
-		}
-
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 
 		// CountDownLatch newNodeAwaitLatch = new CountDownLatch(

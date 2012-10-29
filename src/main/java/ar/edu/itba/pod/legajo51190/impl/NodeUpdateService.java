@@ -105,13 +105,15 @@ public class NodeUpdateService {
 
 							nodeLogger.log("Updating my new nodes...");
 
-							// This synchronized might be a bit too much.
 							synchronized (node) {
 								syncMembers(
 										Lists.newArrayList(allMembersButMyself),
 										Lists.newArrayList(node.getAliveNodes()),
 										signalsCopy, copyOfBackupSignals);
-								node.getToDistributeSignals().clear();
+								synchronized (node.getToDistributeSignals()) {
+									node.getToDistributeSignals().removeAll(
+											signalsCopy);
+								}
 							}
 
 							if (node.getToDistributeSignals().isEmpty()
@@ -157,7 +159,6 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							// This synchronized might be a bit too much.
 							synchronized (node) {
 								awaitLatch = new CountDownLatch(1);
 
