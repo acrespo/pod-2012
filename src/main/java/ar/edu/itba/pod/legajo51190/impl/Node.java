@@ -42,7 +42,7 @@ public class Node implements JGroupNode {
 
 	public Node(final NodeListener listener) throws Exception {
 		super();
-		channel = new JChannel("tcp.xml");
+		channel = new JChannel("udp-largecluster.xml");
 		this.listener = listener;
 		Multimap<Address, Signal> sig = HashMultimap.create();
 		backupSignals = Multimaps.synchronizedMultimap(sig);
