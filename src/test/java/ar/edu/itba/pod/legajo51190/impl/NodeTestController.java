@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.signal.source.RandomSource;
 
 /**
@@ -161,6 +162,30 @@ public class NodeTestController {
 
 		try {
 			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
+			}
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Something didn't sync right");
+		}
+	}
+
+	public void prepareNodeForSendingSignals(final SignalNode last) {
+		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
+		getListener().setNewNodeLatch(newNodeAwaitLatch);
+	}
+
+	public void addSignalToNode(final SignalNode last, final Signal s) {
+		try {
+			last.add(s);
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void awaitSignalsSentToNode(final SignalNode last) {
+		try {
+			if (!getListener().getNewNodeAwaitLatch().await(30,
+					TimeUnit.SECONDS)) {
 				throw new InterruptedException();
 			}
 		} catch (InterruptedException e) {

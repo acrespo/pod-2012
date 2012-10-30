@@ -70,4 +70,8 @@ public class SyncListener implements ChannelListener, NodeListener {
 		}
 	}
 
+	public CountDownLatch getNewNodeAwaitLatch() {
+		return newNodeLatch;
+	}
+
 }

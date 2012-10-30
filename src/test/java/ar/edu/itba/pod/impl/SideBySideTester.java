@@ -30,9 +30,9 @@ import ar.edu.itba.pod.signal.source.Source;
  * this and overriding the init() method.
  */
 public abstract class SideBySideTester {
-	private SignalProcessor reference;
-	private SignalProcessor toTest;
-	private Source src;
+	protected SignalProcessor reference;
+	protected SignalProcessor toTest;
+	protected Source src;
 
 	@Before
 	public void setup() throws Exception {
@@ -149,12 +149,12 @@ public abstract class SideBySideTester {
 		System.out.println("Time total to find reference:" + (t3 - t2));
 	}
 
-	private void add(final Signal s) throws RemoteException {
+	protected void add(final Signal s) throws RemoteException {
 		reference.add(s);
 		toTest.add(s);
 	}
 
-	private void addNoise(final int amount) throws RemoteException {
+	protected void addNoise(final int amount) throws RemoteException {
 		for (int i = 0; i < amount; i++) {
 			Signal s = src.next();
 			reference.add(s);
