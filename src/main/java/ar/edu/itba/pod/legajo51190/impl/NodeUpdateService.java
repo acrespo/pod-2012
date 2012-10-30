@@ -103,7 +103,7 @@ public class NodeUpdateService {
 										.getToDistributeSignals()) {
 									signalsCopy.add(signal);
 									k++;
-									if (k == 5000) {
+									if (k == 50000) {
 										break;
 									}
 								}
