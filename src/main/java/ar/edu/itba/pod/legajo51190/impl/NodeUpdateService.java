@@ -178,7 +178,7 @@ public class NodeUpdateService {
 										new_view.getMembers(), signalsCopy,
 										copyOfBackupSignals);
 
-								if (!awaitLatch.await(3000,
+								if (!awaitLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
 								} else {
@@ -358,7 +358,7 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers) {
 		try {
-			if (!ackLatch.await(5, TimeUnit.SECONDS)) {
+			if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
 				throw new Exception("First timeout");
 			}
 		} catch (Exception e) {
@@ -373,7 +373,7 @@ public class NodeUpdateService {
 				ackLatch = new CountDownLatch(waitingAddresses.size());
 
 				try {
-					if (!ackLatch.await(5, TimeUnit.SECONDS)) {
+					if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
 						throw new Exception(
 								"Second timeout, some nodes are not answering");
 					}
@@ -467,7 +467,7 @@ public class NodeUpdateService {
 			}
 
 			try {
-				memberGoneLatch.await(3000, TimeUnit.MILLISECONDS);
+				memberGoneLatch.await(10000, TimeUnit.MILLISECONDS);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

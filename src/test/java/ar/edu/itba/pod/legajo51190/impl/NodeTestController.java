@@ -50,7 +50,7 @@ public class NodeTestController {
 
 		if (!isBlocking) {
 			try {
-				disconnectionLatch.await(3, TimeUnit.SECONDS);
+				disconnectionLatch.await(10000, TimeUnit.MILLISECONDS);
 			} catch (InterruptedException e) {
 				throw new RuntimeException("Something didn't sync right");
 			}
