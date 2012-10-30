@@ -24,4 +24,9 @@ public class SideBySideExampleTester extends SideBySideTester {
 		return sp;
 	}
 
+	@Override
+	protected void clear() throws Exception {
+
+	}
+
 }
