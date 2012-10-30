@@ -59,6 +59,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	@Override
 	public void receive(final Message msg) {
 		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
+
 			// If the message is a globalsync, we might not have our view info
 			// ready. So we must take that into account.
 			safelyProcess(msg);
@@ -109,6 +110,9 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 	private void onNewNodeSync(final Message msg,
 			final GlobalSyncNodeMessage message) {
+		nodeLogger.log("Got data! " + message.getSignalsMap().size()
+				+ " signals " + message.getBackupSignals() + " backups");
+
 		// We save the signals that were sent to us
 		storeLocalSignals(message);
 
@@ -123,6 +127,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// If we're a new node we tell we're no longer one
 		// After we got all the messages from all our neighbours
 		handleNewNodeCallback(message);
+
+		nodeLogger.log("We are done!");
 	}
 
 	private void handleNewNodeCallback(final GlobalSyncNodeMessage message) {

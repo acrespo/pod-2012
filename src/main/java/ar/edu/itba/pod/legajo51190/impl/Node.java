@@ -117,7 +117,8 @@ public class Node implements JGroupNode {
 	public NodeStats getStats() {
 		// TODO: Improve nodestats implementation
 		return new NodeStats(getAddress().toString(), 0, signals.size()
-				+ redistributionSignals.size(), backupSignals.size(), false);
+				+ toDistributeSignals.size() + redistributionSignals.size(),
+				backupSignals.size(), false);
 	}
 
 	@Override

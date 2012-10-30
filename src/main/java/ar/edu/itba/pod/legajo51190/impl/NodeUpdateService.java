@@ -86,17 +86,31 @@ public class NodeUpdateService {
 			public void run() {
 				try {
 
+					nodeLogger.log("Pending nodes..."
+							+ node.getToDistributeSignals().size());
+
 					// If there is connection and the timer can work.
 					if (timerEnabled.get() && node.getChannel() != null
 							&& node.getChannel().isConnected()) {
 
-						// The copy of the signals to send must be isolated
-						final Set<Signal> signalsCopy = new HashSet<>();
-						synchronized (node.getToDistributeSignals()) {
-							signalsCopy.addAll(node.getToDistributeSignals());
-						}
+						if (node.getToDistributeSignals().size() > 0) {
 
-						if (signalsCopy.size() > 0) {
+							nodeLogger.log("Sending nodes..."
+									+ node.getToDistributeSignals().size());
+
+							// The copy of the signals to send must be isolated
+							final Set<Signal> signalsCopy = new HashSet<>();
+							synchronized (node.getToDistributeSignals()) {
+								int k = 0;
+								for (Signal signal : node
+										.getToDistributeSignals()) {
+									signalsCopy.add(signal);
+									k++;
+									if (k == 5000) {
+										break;
+									}
+								}
+							}
 
 							List<Address> allMembersButMyself = getAllNodesButMe(
 									node, node.getAliveNodes());
@@ -106,8 +120,6 @@ public class NodeUpdateService {
 							synchronized (node.getBackupSignals()) {
 								copyOfBackupSignals = HashMultimap.create();
 							}
-
-							nodeLogger.log("Updating my new nodes...");
 
 							synchronized (node) {
 								syncMembers(
@@ -124,6 +136,8 @@ public class NodeUpdateService {
 									&& node.getListener() != null) {
 								node.getListener().onNodeSyncDone();
 							}
+
+							nodeLogger.log("Sent nodes!!!");
 						}
 
 					}
