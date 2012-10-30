@@ -86,9 +86,6 @@ public class NodeUpdateService {
 			public void run() {
 				try {
 
-					nodeLogger.log("Pending nodes..."
-							+ node.getToDistributeSignals().size());
-
 					// If there is connection and the timer can work.
 					if (timerEnabled.get() && node.getChannel() != null
 							&& node.getChannel().isConnected()) {
