@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jgroups.Address;
+import org.jgroups.Channel;
 import org.jgroups.View;
 
 import ar.edu.itba.pod.api.NodeStats;
@@ -45,4 +46,6 @@ public interface JGroupNode {
 	public boolean isOnline();
 
 	public void joinChannel(String name) throws RemoteException;
+
+	public Channel getChannel();
 }

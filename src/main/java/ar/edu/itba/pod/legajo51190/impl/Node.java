@@ -63,6 +63,7 @@ public class Node implements JGroupNode {
 		return aliveNodes;
 	}
 
+	@Override
 	public Channel getChannel() {
 		return channel;
 	}

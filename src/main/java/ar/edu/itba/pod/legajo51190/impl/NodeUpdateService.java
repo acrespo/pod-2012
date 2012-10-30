@@ -268,8 +268,6 @@ public class NodeUpdateService {
 							allMembersButMe, allMembers);
 					if (!addressToSendData.equals(node.getAddress())
 							&& newMembersAndMe.contains(addressToSendData)) {
-						// TODO: Check if we're not sending data badly..
-						// Should we add !newMembersAndMe.contains(backupAddr) ?
 						backupSignalsToSend.put(backupAddr, sign);
 					}
 				}
@@ -291,7 +289,6 @@ public class NodeUpdateService {
 
 	/**
 	 * Save signals in a transaction, must be done after all ACKs are received
-	 * TODO: Improve and dont do when not all are received
 	 * 
 	 * @param signalsToSend
 	 *            Signals that will be send as data to store to the new nodes /
@@ -406,7 +403,6 @@ public class NodeUpdateService {
 			final boolean copyMode, final List<Address> allMembers,
 			final Address address) {
 
-		// TODO: ask how to improve this if we can
 		if (node.isOnline()) {
 			try {
 				node.getChannel().send(

@@ -37,9 +37,11 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private final NodeLogger nodeLogger;
 	private final AtomicInteger newNodePartsCount = new AtomicInteger(0);
 	private final AtomicBoolean isNewNode = new AtomicBoolean(true);
+	private final JGroupSignalProcessor processor;
 
-	public NodeReceiver(final Node node) {
+	public NodeReceiver(final Node node, final JGroupSignalProcessor processor) {
 		this.node = node;
+		this.processor = processor;
 		updateService = new NodeUpdateService(node);
 		connectionService = Executors.newCachedThreadPool();
 		connectionPendingTasks = new LinkedBlockingQueue<>();
@@ -70,6 +72,12 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			onNotifyNewNodeReady();
 		} else if (msg.getObject() instanceof GoneMessageSentNodeMessage) {
 			onNotifyGoneMessageReceived();
+		} else if (msg.getObject() instanceof QueryNodeMessage) {
+			processor.onQueryReception((QueryNodeMessage) msg.getObject(),
+					msg.getSrc());
+		} else if (msg.getObject() instanceof QueryResultNodeMessage) {
+			processor.onResultReception(
+					(QueryResultNodeMessage) msg.getObject(), msg.getSrc());
 		}
 	}
 

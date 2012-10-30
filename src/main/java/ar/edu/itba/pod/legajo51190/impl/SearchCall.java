@@ -14,12 +14,12 @@ import ar.edu.itba.pod.api.Signal;
  * 
  * @author cris
  */
-public class LocalSearchCall implements Callable<List<Result.Item>> {
+public class SearchCall implements Callable<List<Result.Item>> {
 
 	private final BlockingQueue<Signal> querySignals;
 	private final Signal signal;
 
-	public LocalSearchCall(final BlockingQueue<Signal> querySignals,
+	public SearchCall(final BlockingQueue<Signal> querySignals,
 			final Signal signal) {
 		super();
 		this.querySignals = querySignals;
