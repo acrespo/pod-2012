@@ -141,6 +141,9 @@ public class NodeUpdateService {
 
 							if (node.getToDistributeSignals().isEmpty()
 									&& node.getListener() != null) {
+								synchronized (this) {
+									notifyAll();
+								}
 								node.getListener().onNodeSyncDone();
 							}
 
@@ -171,6 +174,14 @@ public class NodeUpdateService {
 				try {
 					if (node.getLastView() != null
 							&& node.getToDistributeSignals().size() == 0) {
+
+						// If we are distributing signals we have to wait
+						// For the distribution to be done
+						if (node.getToDistributeSignals().size() > 0) {
+							synchronized (this) {
+								this.wait(120000);
+							}
+						}
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
@@ -252,8 +263,8 @@ public class NodeUpdateService {
 							}
 
 						}
-
 					}
+
 					node.setNodeView(new_view);
 				} catch (Exception e) {
 					e.printStackTrace();
