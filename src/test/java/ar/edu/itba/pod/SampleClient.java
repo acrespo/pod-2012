@@ -9,6 +9,7 @@ import java.rmi.registry.Registry;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.SPNode;
+import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.signal.source.RandomSource;
 
@@ -21,10 +22,13 @@ public class SampleClient {
 
 	RandomSource src = new RandomSource();
 
+	private final Signal defaultSignal;
+
 	public SampleClient(final String hostname, final int port) {
 		super();
 		this.hostname = hostname;
 		this.port = port;
+		defaultSignal = src.next();
 	}
 
 	public void start() {
@@ -51,7 +55,7 @@ public class SampleClient {
 				} else if (line.equals("3")) {
 					node.getStats().print(System.out);
 				} else if (line.equals("4")) {
-					Result results = sp.findSimilarTo(src.next());
+					Result results = sp.findSimilarTo(defaultSignal);
 					System.out.println(">>> Result: " + results);
 				} else if (line.equals("5")) {
 					generate(sp, 1);
