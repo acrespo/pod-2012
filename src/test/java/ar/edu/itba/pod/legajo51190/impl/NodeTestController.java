@@ -125,7 +125,7 @@ public class NodeTestController {
 		}
 
 		try {
-			if (!newNodeAwaitLatch.await(15, TimeUnit.SECONDS)) {
+			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
 				System.out.println("I GOT " + newNodeAwaitLatch.getCount());
 				throw new InterruptedException();
 			}

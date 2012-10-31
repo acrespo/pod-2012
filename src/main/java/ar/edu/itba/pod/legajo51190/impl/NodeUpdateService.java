@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 
 public class NodeUpdateService {
 
+	private static final int CHUNK_SIZE = 5000;
 	/**
 	 * Represents the addresses awaiting for response when a synchronization
 	 * action is done
@@ -103,7 +104,7 @@ public class NodeUpdateService {
 										.getToDistributeSignals()) {
 									signalsCopy.add(signal);
 									k++;
-									if (k == 50000) {
+									if (k == CHUNK_SIZE) {
 										break;
 									}
 								}
@@ -112,11 +113,8 @@ public class NodeUpdateService {
 							List<Address> allMembersButMyself = getAllNodesButMe(
 									node, node.getAliveNodes());
 
-							// TODO: Take this out.
-							Multimap<Address, Signal> copyOfBackupSignals = null;
-							synchronized (node.getBackupSignals()) {
-								copyOfBackupSignals = HashMultimap.create();
-							}
+							Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
+									.create();
 
 							synchronized (node) {
 								syncMembers(
@@ -185,9 +183,29 @@ public class NodeUpdateService {
 							synchronized (node) {
 								awaitLatch = new CountDownLatch(1);
 
-								syncMembers(Lists.newArrayList(newMembers),
-										new_view.getMembers(), signalsCopy,
-										copyOfBackupSignals);
+								do {
+									int k = 0;
+
+									Set<Signal> signalsCopyToSend = new HashSet<>();
+									Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
+											.create();
+
+									prepareChunkOfData(signalsCopy,
+											copyOfBackupSignals, k,
+											signalsCopyToSend,
+											copyOfBackupSignalsToSend);
+
+									syncMembers(Lists.newArrayList(newMembers),
+											new_view.getMembers(),
+											signalsCopyToSend,
+											copyOfBackupSignalsToSend);
+
+									removeCopyData(signalsCopy,
+											copyOfBackupSignals,
+											signalsCopyToSend,
+											copyOfBackupSignalsToSend);
+								} while (copyOfBackupSignals.size() > 0
+										|| signalsCopy.size() > 0);
 
 								if (!awaitLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
@@ -211,7 +229,42 @@ public class NodeUpdateService {
 					e.printStackTrace();
 				}
 			}
+
 		});
+	}
+
+	private void removeCopyData(final Set<Signal> signalsCopy,
+			final Multimap<Address, Signal> copyOfBackupSignals,
+			final Set<Signal> signalsCopyToSend,
+			final Multimap<Address, Signal> copyOfBackupSignalsToSend) {
+		signalsCopy.removeAll(signalsCopyToSend);
+		for (java.util.Map.Entry<Address, Signal> e : copyOfBackupSignalsToSend
+				.entries()) {
+			copyOfBackupSignals.remove(e.getKey(), e.getValue());
+		}
+	}
+
+	private void prepareChunkOfData(final Set<Signal> signalsCopy,
+			final Multimap<Address, Signal> copyOfBackupSignals, int k,
+			final Set<Signal> signalsCopyToSend,
+			final Multimap<Address, Signal> copyOfBackupSignalsToSend) {
+		for (Signal s : signalsCopy) {
+			signalsCopyToSend.add(s);
+			k++;
+			if (k == CHUNK_SIZE / 2) {
+				break;
+			}
+		}
+
+		k = 0;
+		for (java.util.Map.Entry<Address, Signal> e : copyOfBackupSignals
+				.entries()) {
+			copyOfBackupSignalsToSend.put(e.getKey(), e.getValue());
+			k++;
+			if (k == CHUNK_SIZE / 2) {
+				break;
+			}
+		}
 	}
 
 	private void syncMembers(final List<Address> newMembers,
@@ -453,11 +506,8 @@ public class NodeUpdateService {
 			signalsCopy = new HashSet<>(node.getRedistribuitionSignals());
 		}
 
-		Multimap<Address, Signal> copyOfBackupSignals = null;
-
-		synchronized (node.getBackupSignals()) {
-			copyOfBackupSignals = HashMultimap.create(node.getBackupSignals());
-		}
+		Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
+				.create(node.getBackupSignals());
 
 		synchronized (node) {
 
@@ -466,8 +516,22 @@ public class NodeUpdateService {
 
 			memberGoneLatch = new CountDownLatch(allMembersButMyself.size());
 
-			syncMembers(allMembersButMyself, view.getMembers(), signalsCopy,
-					copyOfBackupSignals);
+			do {
+				int k = 0;
+
+				Set<Signal> signalsCopyToSend = new HashSet<>();
+				Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
+						.create();
+
+				prepareChunkOfData(signalsCopy, copyOfBackupSignals, k,
+						signalsCopyToSend, copyOfBackupSignalsToSend);
+
+				syncMembers(allMembersButMyself, view.getMembers(),
+						signalsCopyToSend, copyOfBackupSignalsToSend);
+
+				removeCopyData(signalsCopy, copyOfBackupSignals,
+						signalsCopyToSend, copyOfBackupSignalsToSend);
+			} while (copyOfBackupSignals.size() > 0 || signalsCopy.size() > 0);
 
 			if (node.isOnline()) {
 				tellOtherNodesImDoneRedistributingData();
