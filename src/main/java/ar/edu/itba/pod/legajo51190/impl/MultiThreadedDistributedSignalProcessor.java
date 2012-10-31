@@ -154,10 +154,15 @@ public class MultiThreadedDistributedSignalProcessor implements
 		int queryId = queryIdGenerator.getAndIncrement();
 
 		askRemoteQueries(signal, queryId);
+		nodeLogger.log("Asking remotes for the query!");
 
+		nodeLogger.log("Resolving local query!");
 		result = resolveLocalQueries(signal, result);
+		nodeLogger.log("Resolved local query!");
 
+		nodeLogger.log("Awaiting remote answers!");
 		result = awaitRemoteAnswers(result, queryId);
+		nodeLogger.log("Got remote answers!");
 
 		return result;
 	}
@@ -206,7 +211,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 			@Override
 			public void run() {
 				Result result = new Result(query.getSignal());
+
+				nodeLogger.log("Got remote queries!");
 				result = resolveLocalQueries(query.getSignal(), result);
+				nodeLogger.log("Responding remote queries!");
+
 				Message msg = new Message(from, new QueryResultNodeMessage(
 						query.getQueryId(), result));
 
