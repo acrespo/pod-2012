@@ -23,4 +23,9 @@ public interface JGroupSignalProcessor {
 	 * Builds a new remote query with the message received
 	 */
 	public void onResultReception(QueryResultNodeMessage answer, Address from);
+
+	/**
+	 * Tells the signal processor that all the fallen nodes are fixed
+	 */
+	public void onNodeGoneFixed();
 }

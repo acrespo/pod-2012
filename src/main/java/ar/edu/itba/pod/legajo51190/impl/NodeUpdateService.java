@@ -116,15 +116,27 @@ public class NodeUpdateService {
 							Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
 									.create();
 
-							synchronized (node) {
-								syncMembers(
-										Lists.newArrayList(allMembersButMyself),
-										Lists.newArrayList(node.getAliveNodes()),
-										signalsCopy, copyOfBackupSignals);
-								synchronized (node.getToDistributeSignals()) {
-									node.getToDistributeSignals().removeAll(
-											signalsCopy);
-								}
+							boolean isOk = true;
+
+							isOk = syncMembers(
+									Lists.newArrayList(allMembersButMyself),
+									Lists.newArrayList(node.getAliveNodes()),
+									signalsCopy, copyOfBackupSignals);
+
+							if (!isOk) {
+
+								System.out.println("node fallen on sync!");
+								List<Address> allMinusWaiting = new ArrayList<>(
+										node.getAliveNodes());
+								allMinusWaiting.removeAll(waitingAddresses);
+
+								resolveGoneMembers(waitingAddresses,
+										allMinusWaiting);
+							}
+
+							synchronized (node.getToDistributeSignals()) {
+								node.getToDistributeSignals().removeAll(
+										signalsCopy);
 							}
 
 							if (node.getToDistributeSignals().isEmpty()
@@ -157,12 +169,14 @@ public class NodeUpdateService {
 			@Override
 			public void run() {
 				try {
-					if (node.getLastView() != null) {
+					if (node.getLastView() != null
+							&& node.getToDistributeSignals().size() == 0) {
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
 						if (goneMembers.size() > 0) {
-							resolveGoneMembers(goneMembers, new_view);
+							resolveGoneMembers(goneMembers,
+									new_view.getMembers());
 						}
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
@@ -180,33 +194,43 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							synchronized (node) {
-								awaitLatch = new CountDownLatch(1);
+							awaitLatch = new CountDownLatch(1);
 
-								do {
-									int k = 0;
+							boolean isOK = true;
+							do {
+								int k = 0;
 
-									Set<Signal> signalsCopyToSend = new HashSet<>();
-									Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
-											.create();
+								Set<Signal> signalsCopyToSend = new HashSet<>();
+								Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
+										.create();
 
-									prepareChunkOfData(signalsCopy,
-											copyOfBackupSignals, k,
-											signalsCopyToSend,
-											copyOfBackupSignalsToSend);
+								prepareChunkOfData(signalsCopy,
+										copyOfBackupSignals, k,
+										signalsCopyToSend,
+										copyOfBackupSignalsToSend);
 
-									syncMembers(Lists.newArrayList(newMembers),
-											new_view.getMembers(),
-											signalsCopyToSend,
-											copyOfBackupSignalsToSend);
+								nodeLogger.log("Sending nodes..."
+										+ (signalsCopyToSend.size() + copyOfBackupSignalsToSend
+												.size()));
 
+								isOK = syncMembers(
+										Lists.newArrayList(newMembers),
+										new_view.getMembers(),
+										signalsCopyToSend,
+										copyOfBackupSignalsToSend);
+
+								if (isOK) {
 									removeCopyData(signalsCopy,
 											copyOfBackupSignals,
 											signalsCopyToSend,
 											copyOfBackupSignalsToSend);
-								} while (copyOfBackupSignals.size() > 0
-										|| signalsCopy.size() > 0);
+								} else {
+									break;
+								}
+							} while (copyOfBackupSignals.size() > 0
+									|| signalsCopy.size() > 0);
 
+							if (isOK) {
 								if (!awaitLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
@@ -214,7 +238,13 @@ public class NodeUpdateService {
 									nodeLogger.log("New node sync call for "
 											+ newMembers.toString());
 								}
+							} else {
+								List<Address> allMinusWaiting = new ArrayList<>(
+										new_view.getMembers());
+								allMinusWaiting.removeAll(waitingAddresses);
 
+								resolveGoneMembers(waitingAddresses,
+										allMinusWaiting);
 							}
 
 							if (node.getListener() != null) {
@@ -267,7 +297,7 @@ public class NodeUpdateService {
 		}
 	}
 
-	private void syncMembers(final List<Address> newMembers,
+	private boolean syncMembers(final List<Address> newMembers,
 			final List<Address> allMembers, final Set<Signal> signalsCopy,
 			final Multimap<Address, Signal> backupMapCopy) {
 
@@ -328,16 +358,19 @@ public class NodeUpdateService {
 
 		}
 
+		boolean isOK = true;
 		if (node.isOnline()) {
 			// We send the signals to the group members
-			sendSignalsToMembers(signalsToKeep, signalsToSend,
+			isOK = sendSignalsToMembers(signalsToKeep, signalsToSend,
 					backupSignalsToSend, copyMode, allMembersButMe, allMembers);
 		}
 
-		if (node.isOnline()) {
+		if (node.isOnline() && isOK) {
 			// We save the signals in a locked action.
 			safelySaveSignals(signalsToSend, signalsToKeep, backupSignalsToSend);
 		}
+
+		return isOK;
 	}
 
 	/**
@@ -378,7 +411,7 @@ public class NodeUpdateService {
 	/**
 	 * Sends the signals to the members of the group.
 	 */
-	private void sendSignalsToMembers(final Set<Signal> signalsToKeep,
+	private boolean sendSignalsToMembers(final Set<Signal> signalsToKeep,
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> receptors,
@@ -412,10 +445,12 @@ public class NodeUpdateService {
 			e.printStackTrace();
 		}
 
-		handleTimeouts(signalsToSend, backupSignalsToSend, copyMode, allMembers);
+		return handleTimeouts(signalsToSend, backupSignalsToSend, copyMode,
+				allMembers);
 	}
 
-	private void handleTimeouts(final Multimap<Address, Signal> signalsToSend,
+	private boolean handleTimeouts(
+			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers) {
 		try {
@@ -439,12 +474,12 @@ public class NodeUpdateService {
 								"Second timeout, some nodes are not answering");
 					}
 				} catch (Exception e1) {
-					// TODO: Handle this.
-					e1.printStackTrace();
+					return false;
 				}
 			}
 
 		}
+		return true;
 	}
 
 	/**
@@ -475,28 +510,34 @@ public class NodeUpdateService {
 	 * Recovers the backups from the fallen nodes. If more than one member is
 	 * gone we cannot guarantee the recovery of all messages.
 	 */
-	private void resolveGoneMembers(final Set<Address> goneMembers,
-			final View view) {
+	private void resolveGoneMembers(final Collection<Address> goneMembers,
+			final List<Address> allMembers) {
 		if (goneMembers.size() > 1) {
 			nodeLogger
 					.log("More than one member is gone, we might have lost messages :(");
 		}
 		synchronized (node.getBackupSignals()) {
 			synchronized (node.getLocalSignals()) {
-				synchronized (node.getRedistribuitionSignals()) {
-					for (Address address : goneMembers) {
-						nodeLogger.log("Recovering backups from "
-								+ address.toString() + " size: "
-								+ node.getBackupSignals().get(address).size());
+				synchronized (node.getToDistributeSignals()) {
+					synchronized (node.getRedistribuitionSignals()) {
+						for (Address address : goneMembers) {
+							nodeLogger.log("Recovering backups from "
+									+ address.toString()
+									+ " size: "
+									+ node.getBackupSignals().get(address)
+											.size());
+							node.getRedistribuitionSignals().addAll(
+									node.getBackupSignals().get(address));
+						}
 						node.getRedistribuitionSignals().addAll(
-								node.getBackupSignals().get(address));
+								node.getLocalSignals());
+						node.getRedistribuitionSignals().addAll(
+								node.getToDistributeSignals());
+						node.getBackupSignals().clear();
+						node.getLocalSignals().clear();
+						node.getToDistributeSignals().clear();
+						timerEnabled.set(false);
 					}
-					node.getRedistribuitionSignals().addAll(
-							node.getLocalSignals());
-					node.getBackupSignals().clear();
-					node.getLocalSignals().clear();
-					node.getToDistributeSignals().clear();
-					timerEnabled.set(false);
 				}
 			}
 		}
@@ -506,49 +547,52 @@ public class NodeUpdateService {
 			signalsCopy = new HashSet<>(node.getRedistribuitionSignals());
 		}
 
+		System.out.println("Total redistribution size: " + signalsCopy.size());
+
 		Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
 				.create(node.getBackupSignals());
 
-		synchronized (node) {
+		List<Address> allMembersButMyself = getAllNodesButMe(node, allMembers);
 
-			List<Address> allMembersButMyself = getAllNodesButMe(node,
-					view.getMembers());
+		memberGoneLatch = new CountDownLatch(allMembersButMyself.size());
 
-			memberGoneLatch = new CountDownLatch(allMembersButMyself.size());
+		do {
+			int k = 0;
 
-			do {
-				int k = 0;
+			Set<Signal> signalsCopyToSend = new HashSet<>();
+			Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
+					.create();
 
-				Set<Signal> signalsCopyToSend = new HashSet<>();
-				Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
-						.create();
+			prepareChunkOfData(signalsCopy, copyOfBackupSignals, k,
+					signalsCopyToSend, copyOfBackupSignalsToSend);
 
-				prepareChunkOfData(signalsCopy, copyOfBackupSignals, k,
-						signalsCopyToSend, copyOfBackupSignalsToSend);
+			nodeLogger.log("Sending nodes..."
+					+ (signalsCopyToSend.size() + copyOfBackupSignalsToSend
+							.size()));
+			syncMembers(allMembersButMyself, allMembers, signalsCopyToSend,
+					copyOfBackupSignalsToSend);
 
-				syncMembers(allMembersButMyself, view.getMembers(),
-						signalsCopyToSend, copyOfBackupSignalsToSend);
+			removeCopyData(signalsCopy, copyOfBackupSignals, signalsCopyToSend,
+					copyOfBackupSignalsToSend);
+		} while (copyOfBackupSignals.size() > 0 || signalsCopy.size() > 0);
 
-				removeCopyData(signalsCopy, copyOfBackupSignals,
-						signalsCopyToSend, copyOfBackupSignalsToSend);
-			} while (copyOfBackupSignals.size() > 0 || signalsCopy.size() > 0);
-
-			if (node.isOnline()) {
-				tellOtherNodesImDoneRedistributingData();
-			}
-
-			try {
-				memberGoneLatch.await(10000, TimeUnit.MILLISECONDS);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-
-			node.getRedistribuitionSignals().clear();
-
-			if (node.getListener() != null) {
-				node.getListener().onNodeGoneSyncDone();
-			}
+		if (node.isOnline()) {
+			tellOtherNodesImDoneRedistributingData();
 		}
+
+		try {
+			memberGoneLatch.await(10000, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		node.getRedistribuitionSignals().clear();
+
+		if (node.getListener() != null) {
+			node.getListener().onNodeGoneSyncDone();
+		}
+		node.getSignalProcessor().onNodeGoneFixed();
+
 	}
 
 	private void tellOtherNodesImDoneRedistributingData() {

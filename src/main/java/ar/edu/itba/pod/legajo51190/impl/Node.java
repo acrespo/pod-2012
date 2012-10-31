@@ -39,9 +39,12 @@ public class Node implements JGroupNode {
 	private final Channel channel;
 	private final NodeListener listener;
 	private final AtomicBoolean online = new AtomicBoolean(false);
+	private final JGroupSignalProcessor signalProcessor;
 
-	public Node(final NodeListener listener) throws Exception {
+	public Node(final NodeListener listener,
+			final JGroupSignalProcessor signalProcessor) throws Exception {
 		super();
+		this.signalProcessor = signalProcessor;
 		channel = new JChannel("udp-largecluster.xml");
 		this.listener = listener;
 		Multimap<Address, Signal> sig = HashMultimap.create();
@@ -160,5 +163,9 @@ public class Node implements JGroupNode {
 			}
 		}
 		getChannel().close();
+	}
+
+	public JGroupSignalProcessor getSignalProcessor() {
+		return signalProcessor;
 	}
 }

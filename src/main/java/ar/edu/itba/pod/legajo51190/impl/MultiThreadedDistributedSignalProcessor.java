@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -62,12 +63,14 @@ public class MultiThreadedDistributedSignalProcessor implements
 		}
 	}
 
+	private final Semaphore sem = new Semaphore(0);
 	private final ListeningExecutorService localProcessingService;
 	private final ExecutorService requestProcessingService;
 	private final int threads;
 	private final NodeReceiver networkState;
 	private final Node node;
 	private final ConcurrentHashMap<Integer, RemoteQuery> queries;
+	private final AtomicInteger awaitQueryCount = new AtomicInteger(0);
 	private final AtomicInteger queryIdGenerator = new AtomicInteger(0);
 	@SuppressWarnings("unused")
 	private final NodeLogger nodeLogger;
@@ -85,8 +88,8 @@ public class MultiThreadedDistributedSignalProcessor implements
 		requestProcessingService = Executors.newCachedThreadPool();
 		localProcessingService = MoreExecutors.listeningDecorator(Executors
 				.newFixedThreadPool(threads));
-		node = new Node(nodeListener);
-		networkState = new NodeReceiver(node, this);
+		node = new Node(nodeListener, this);
+		networkState = new NodeReceiver(node);
 		node.getChannel().setDiscardOwnMessages(true);
 
 		if (networkState != null) {
@@ -151,6 +154,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		Result result = new Result(signal);
 
+		awaitQueryCount.incrementAndGet();
 		int queryId = queryIdGenerator.getAndIncrement();
 
 		askRemoteQueries(signal, queryId);
@@ -164,14 +168,38 @@ public class MultiThreadedDistributedSignalProcessor implements
 		result = awaitRemoteAnswers(result, queryId);
 		nodeLogger.log("Got remote answers!");
 
+		if (result == null) {
+			try {
+				nodeLogger.log("Waiting for node recovery!");
+				sem.tryAcquire(30000, TimeUnit.MILLISECONDS);
+				nodeLogger.log("Node recovery done!");
+
+				result = new Result(signal);
+
+				askRemoteQueries(signal, queryId);
+				nodeLogger.log("Asking remotes for the query!");
+
+				nodeLogger.log("Resolving local query!");
+				result = resolveLocalQueries(signal, result);
+				nodeLogger.log("Resolved local query!");
+
+				nodeLogger.log("Awaiting remote answers!");
+				result = awaitRemoteAnswers(result, queryId);
+				nodeLogger.log("Got remote answers!");
+
+			} catch (InterruptedException e) {
+				throw new RemoteException(e.getMessage());
+			}
+		}
+
 		return result;
 	}
 
 	private Result awaitRemoteAnswers(Result result, final int queryId) {
 		try {
 			RemoteQuery query = queries.get(queryId);
-			if (!query.getAwaits().await(100000, TimeUnit.MILLISECONDS)) {
-				nodeLogger.log("GOT NO! ANSWER!");
+			if (!query.getAwaits().await(10000, TimeUnit.MILLISECONDS)) {
+				return null;
 			}
 
 			for (Result res : query.getResults()) {
@@ -179,8 +207,8 @@ public class MultiThreadedDistributedSignalProcessor implements
 					result = result.include(item);
 				}
 			}
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			return null;
 		}
 		return result;
 	}
@@ -262,5 +290,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 			e.printStackTrace();
 		}
 		return result;
+	}
+
+	@Override
+	public void onNodeGoneFixed() {
+		System.out.println("GONE NODE FIXED!");
+		sem.release(awaitQueryCount.getAndSet(0));
 	}
 }

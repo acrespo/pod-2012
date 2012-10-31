@@ -48,4 +48,6 @@ public interface JGroupNode {
 	public void joinChannel(String name) throws RemoteException;
 
 	public Channel getChannel();
+
+	JGroupSignalProcessor getSignalProcessor();
 }
