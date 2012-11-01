@@ -154,6 +154,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		final Message reply = msg.makeReply();
 		reply.setObject(new GlobalSyncNodeMessageAnswer(node.getAddress()));
 		sendSafeAnswer(reply);
+		updateService.allowSync();
 	}
 
 	private void handleBackupSignals(final Message msg,

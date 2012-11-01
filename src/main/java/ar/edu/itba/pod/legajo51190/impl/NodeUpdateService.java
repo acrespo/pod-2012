@@ -10,6 +10,7 @@ import java.util.TimerTask;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,6 +29,9 @@ import com.google.common.collect.Sets;
 public class NodeUpdateService {
 
 	private static final int CHUNK_SIZE = 5000;
+
+	private final Semaphore newNodeSemaphore = new Semaphore(0);
+
 	/**
 	 * Represents the addresses awaiting for response when a synchronization
 	 * action is done
@@ -172,6 +176,7 @@ public class NodeUpdateService {
 			@Override
 			public void run() {
 				try {
+					newNodeSemaphore.acquire();
 					if (node.getLastView() != null
 							&& node.getToDistributeSignals().size() == 0) {
 
@@ -263,6 +268,7 @@ public class NodeUpdateService {
 					}
 
 					node.setNodeView(new_view);
+					newNodeSemaphore.release();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -677,5 +683,9 @@ public class NodeUpdateService {
 		if (memberGoneLatch != null) {
 			memberGoneLatch.countDown();
 		}
+	}
+
+	public void allowSync() {
+		newNodeSemaphore.release();
 	}
 }
