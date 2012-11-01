@@ -50,7 +50,7 @@ public class NodeUpdateService {
 	 * Latch for awaiting the signal from new nodes to synchronize, needed to
 	 * have many incoming nodes at the same time without exploding
 	 */
-	private CountDownLatch awaitLatch;
+	private CountDownLatch newMemberLatch;
 	/**
 	 * Latch for awaiting the signal from the rest of the nodes of the group on
 	 * the notification of readyness after a gone member
@@ -93,8 +93,8 @@ public class NodeUpdateService {
 
 						if (node.getToDistributeSignals().size() > 0) {
 
-							nodeLogger.log("Sending nodes..."
-									+ node.getToDistributeSignals().size());
+							// nodeLogger.log("Sending nodes..."
+							// + node.getToDistributeSignals().size());
 
 							// The copy of the signals to send must be isolated
 							final Set<Signal> signalsCopy = new HashSet<>();
@@ -147,7 +147,7 @@ public class NodeUpdateService {
 								node.getListener().onNodeSyncDone();
 							}
 
-							nodeLogger.log("Sent nodes!!!");
+							// nodeLogger.log("Sent nodes!!!");
 						}
 
 					}
@@ -205,10 +205,8 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							awaitLatch = new CountDownLatch(new_view
-									.getMembers().size()
-									- newMembers.size()
-									- 1);
+							newMemberLatch = new CountDownLatch(newMembers
+									.size());
 
 							boolean isOK = true;
 							do {
@@ -222,10 +220,6 @@ public class NodeUpdateService {
 										copyOfBackupSignals, k,
 										signalsCopyToSend,
 										copyOfBackupSignalsToSend);
-
-								nodeLogger.log("Sending nodes..."
-										+ (signalsCopyToSend.size() + copyOfBackupSignalsToSend
-												.size()));
 
 								isOK = syncMembers(
 										Lists.newArrayList(newMembers),
@@ -245,7 +239,7 @@ public class NodeUpdateService {
 									|| signalsCopy.size() > 0);
 
 							if (isOK) {
-								if (!awaitLatch.await(10000,
+								if (!newMemberLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
 								} else {
@@ -674,8 +668,8 @@ public class NodeUpdateService {
 	 * received, otherwise things get nasty.
 	 */
 	public void notifyNewNodeReady() {
-		if (awaitLatch != null) {
-			awaitLatch.countDown();
+		if (newMemberLatch != null) {
+			newMemberLatch.countDown();
 		}
 	}
 
