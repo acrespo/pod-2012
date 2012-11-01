@@ -196,7 +196,9 @@ public class NodeUpdateService {
 						}
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
+							nodeLogger.log("Im waiting to be able to sync");
 							newNodeSemaphore.acquire();
+							nodeLogger.log("I can sync! NOW");
 
 							Set<Signal> signalsCopy = null;
 							synchronized (node.getLocalSignals()) {
