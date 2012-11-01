@@ -35,6 +35,7 @@ public abstract class AbstractDistributedNodeTest {
 	@After
 	public void clear() throws Exception {
 		controller.disconnectAllNodesFromChannel();
+		Thread.sleep(5000);
 	}
 
 	public abstract SignalNode createNewSignalNode(SyncListener listener);
