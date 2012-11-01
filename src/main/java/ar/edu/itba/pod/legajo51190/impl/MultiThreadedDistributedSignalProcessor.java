@@ -164,6 +164,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 		result = resolveLocalQueries(signal, result);
 		nodeLogger.log("Resolved local query!");
 
+		if (result == null) {
+			throw new RemoteException("I hate this");
+		}
+
 		nodeLogger.log("Awaiting remote answers!");
 		result = awaitRemoteAnswers(result, queryId);
 		nodeLogger.log("Got remote answers!");
@@ -199,7 +203,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		try {
 			RemoteQuery query = queries.get(queryId);
 			if (!query.getAwaits().await(10000, TimeUnit.MILLISECONDS)) {
-				return null;
+				return result;
 			}
 
 			for (Result res : query.getResults()) {

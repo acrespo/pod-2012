@@ -205,7 +205,10 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							awaitLatch = new CountDownLatch(1);
+							awaitLatch = new CountDownLatch(new_view
+									.getMembers().size()
+									- newMembers.size()
+									- 1);
 
 							boolean isOK = true;
 							do {

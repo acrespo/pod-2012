@@ -25,6 +25,10 @@ public class NodeTestController {
 		this.signalNodeTestFactory = signalNodeTestFactory;
 	}
 
+	public SignalNode getNewSignalNode() {
+		return signalNodeTestFactory.getNewSignalNode(getListener());
+	}
+
 	/**
 	 * Must disconnect all processors and block until it's done.
 	 */
@@ -84,8 +88,6 @@ public class NodeTestController {
 	public void joinNodesToChannel(final Set<SignalNode> nodes,
 			final CountDownLatch controlLatch) {
 
-		boolean isBlocking = false;
-
 		getListener().setConnectionLatch(controlLatch);
 
 		int sum = 0;
@@ -105,28 +107,23 @@ public class NodeTestController {
 
 		for (SignalNode node : nodes) {
 			try {
-				isBlocking = node.getInjectedListener() == null
-						&& node.getInjectedListener() == getListener();
 				node.join("testChannel");
 			} catch (RemoteException e) {
 				e.printStackTrace();
 			}
 		}
 
-		if (!isBlocking) {
-			try {
-				if (!controlLatch.await(10, TimeUnit.SECONDS)) {
-					throw new InterruptedException();
-				}
-
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Something didn't sync right");
+		try {
+			if (!controlLatch.await(10, TimeUnit.SECONDS)) {
+				throw new InterruptedException();
 			}
+
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Something didn't sync right");
 		}
 
 		try {
 			if (!newNodeAwaitLatch.await(30, TimeUnit.SECONDS)) {
-				System.out.println("I GOT " + newNodeAwaitLatch.getCount());
 				throw new InterruptedException();
 			}
 		} catch (InterruptedException e) {
