@@ -176,7 +176,7 @@ public class NodeUpdateService {
 			@Override
 			public void run() {
 				try {
-					newNodeSemaphore.acquire();
+
 					if (node.getLastView() != null
 							&& node.getToDistributeSignals().size() == 0) {
 
@@ -196,6 +196,7 @@ public class NodeUpdateService {
 						}
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
+							newNodeSemaphore.acquire();
 
 							Set<Signal> signalsCopy = null;
 							synchronized (node.getLocalSignals()) {
@@ -210,8 +211,7 @@ public class NodeUpdateService {
 										.getBackupSignals());
 							}
 
-							newMemberLatch = new CountDownLatch(newMembers
-									.size());
+							newMemberLatch = new CountDownLatch(1);
 
 							boolean isOK = true;
 							do {
@@ -264,11 +264,17 @@ public class NodeUpdateService {
 								node.getListener().onNodeSyncDone();
 							}
 
+							newNodeSemaphore.release();
 						}
 					}
 
+					if (node.getLastView() == null
+							&& new_view.getMembers().size() == 1) {
+						newNodeSemaphore.release();
+					}
+
 					node.setNodeView(new_view);
-					newNodeSemaphore.release();
+
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
