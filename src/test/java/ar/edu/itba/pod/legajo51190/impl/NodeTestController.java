@@ -20,6 +20,7 @@ public class NodeTestController {
 	private final SyncListener listener = new SyncListener();
 	private final RandomSource src = new RandomSource(12345);
 	private final SignalNodeTestFactory signalNodeTestFactory;
+	private int channelNumber = 0;
 
 	public NodeTestController(final SignalNodeTestFactory signalNodeTestFactory) {
 		this.signalNodeTestFactory = signalNodeTestFactory;
@@ -37,6 +38,8 @@ public class NodeTestController {
 		if (getNodesToTest().size() == 0) {
 			return;
 		}
+
+		channelNumber++;
 
 		CountDownLatch disconnectionLatch = new CountDownLatch(getNodesToTest()
 				.size());
@@ -107,7 +110,7 @@ public class NodeTestController {
 
 		for (SignalNode node : nodes) {
 			try {
-				node.join("testChannel");
+				node.join("testChannel-" + channelNumber);
 			} catch (RemoteException e) {
 				e.printStackTrace();
 			}

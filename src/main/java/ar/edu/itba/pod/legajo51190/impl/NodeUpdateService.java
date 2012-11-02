@@ -177,6 +177,12 @@ public class NodeUpdateService {
 			public void run() {
 				try {
 
+					if (new_view.getMembers().size() == 1) {
+						nodeLogger.log("Im the first node!");
+						node.setIsNew(false);
+						newNodeSemaphore.release();
+					}
+
 					if (node.getLastView() != null
 							&& node.getToDistributeSignals().size() == 0) {
 
@@ -194,12 +200,12 @@ public class NodeUpdateService {
 							resolveGoneMembers(goneMembers,
 									new_view.getMembers());
 						}
+						nodeLogger.log("Im waiting to be able to sync "
+								+ new_view);
+						newNodeSemaphore.acquire();
+						nodeLogger.log("I can sync! NOW");
 						if (newMembers.size() > 0
-								&& (node.getLocalSignals().size() > 0 || node
-										.isNew())) {
-							nodeLogger.log("Im waiting to be able to sync");
-							newNodeSemaphore.acquire();
-							nodeLogger.log("I can sync! NOW");
+								&& node.getLocalSignals().size() > 0) {
 
 							Set<Signal> signalsCopy = null;
 							synchronized (node.getLocalSignals()) {
@@ -287,15 +293,7 @@ public class NodeUpdateService {
 								node.getListener().onNodeSyncDone();
 							}
 
-							newNodeSemaphore.release();
 						}
-					}
-
-					if (node.getLastView() == null
-							&& new_view.getMembers().size() == 1) {
-						nodeLogger.log("Im the first node!");
-
-						node.setIsNew(false);
 						newNodeSemaphore.release();
 					}
 
