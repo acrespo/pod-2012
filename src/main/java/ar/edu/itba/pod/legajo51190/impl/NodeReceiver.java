@@ -142,7 +142,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// nodeLogger.log("We are done!");
 	}
 
-	private void handleNewNodeCallback(final GlobalSyncNodeMessage message) {
+	private synchronized void handleNewNodeCallback(
+			final GlobalSyncNodeMessage message) {
 		if (node.isNew()) {
 			newNodePartsCount.addAndGet(1);
 			nodeLogger.log("New node check");
