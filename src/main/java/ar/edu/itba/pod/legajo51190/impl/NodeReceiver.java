@@ -138,7 +138,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	}
 
 	private void handleNewNodeCallback(final GlobalSyncNodeMessage message) {
-		if (isNewNode.get()) {
+		if (node.isNew()) {
 			newNodePartsCount.addAndGet(1);
 			nodeLogger.log("New node check");
 			if (newNodePartsCount.get() == message.getAllMembers().size()
@@ -146,7 +146,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 				final Message newNodeReply = new Message(null);
 				newNodeReply.setObject(new NewNodeReadyMessage());
 				sendSafeAnswer(newNodeReply);
-				isNewNode.set(false);
+				node.setIsNew(false);
 				nodeLogger.log("New node callback");
 				updateService.allowSync();
 			}

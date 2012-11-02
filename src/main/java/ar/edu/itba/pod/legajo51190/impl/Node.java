@@ -40,6 +40,7 @@ public class Node implements JGroupNode {
 	private final NodeListener listener;
 	private final AtomicBoolean online = new AtomicBoolean(false);
 	private final JGroupSignalProcessor signalProcessor;
+	private boolean isNew = true;
 
 	public Node(final NodeListener listener,
 			final JGroupSignalProcessor signalProcessor) throws Exception {
@@ -165,7 +166,17 @@ public class Node implements JGroupNode {
 		getChannel().close();
 	}
 
+	@Override
 	public JGroupSignalProcessor getSignalProcessor() {
 		return signalProcessor;
 	}
+
+	public void setIsNew(final boolean b) {
+		isNew = b;
+	}
+
+	public boolean isNew() {
+		return isNew;
+	}
+
 }

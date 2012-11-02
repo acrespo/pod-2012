@@ -291,6 +291,8 @@ public class NodeUpdateService {
 					if (node.getLastView() == null
 							&& new_view.getMembers().size() == 1) {
 						nodeLogger.log("Im the first node!");
+
+						node.setIsNew(false);
 						newNodeSemaphore.release();
 					}
 
