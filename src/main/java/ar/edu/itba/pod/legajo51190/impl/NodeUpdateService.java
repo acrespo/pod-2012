@@ -255,6 +255,8 @@ public class NodeUpdateService {
 									|| signalsCopy.size() > 0);
 
 							if (isOK) {
+
+								nodeLogger.log("Sent sync data and awaiting!");
 								if (!newMemberLatch.await(100000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
