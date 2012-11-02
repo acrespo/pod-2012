@@ -90,7 +90,7 @@ public class HighPerformanceSignalProcessorTest {
 
 		SignalNode node = controller.getNewSignalNode();
 		try {
-			node.join("testChannel");
+			node.join(controller.getChannelName());
 			controller.getNodesToTest().add(node);
 		} catch (RemoteException e) {
 			e.printStackTrace();

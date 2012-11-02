@@ -133,8 +133,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		synchronized (node.getToDistributeSignals()) {
 			synchronized (node.getLocalSignals()) {
-				querySignals.addAll(node.getToDistributeSignals());
-				querySignals.addAll(node.getLocalSignals());
+				synchronized (node.getRedistribuitionSignals()) {
+					querySignals.addAll(node.getToDistributeSignals());
+					querySignals.addAll(node.getRedistribuitionSignals());
+					querySignals.addAll(node.getLocalSignals());
+				}
 			}
 		}
 		return querySignals;
@@ -163,10 +166,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 		result = resolveLocalQueries(signal, result);
 		nodeLogger.log("Resolved local query!");
 
-		if (result == null) {
-			throw new RemoteException("I hate this");
-		}
-
 		nodeLogger.log("Awaiting remote answers!");
 		result = awaitRemoteAnswers(result, queryId);
 		nodeLogger.log("Got remote answers!");
@@ -194,7 +193,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 				throw new RemoteException(e.getMessage());
 			}
 		}
-
+		nodeLogger.log(result.toString());
 		return result;
 	}
 
@@ -211,6 +210,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 				}
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			return null;
 		}
 		return result;
@@ -241,21 +241,26 @@ public class MultiThreadedDistributedSignalProcessor implements
 		requestProcessingService.submit(new Runnable() {
 			@Override
 			public void run() {
-				Result result = new Result(query.getSignal());
+				try {
+					Result result = new Result(query.getSignal());
 
-				nodeLogger.log("Got remote queries!");
-				result = resolveLocalQueries(query.getSignal(), result);
-				nodeLogger.log("Responding remote queries!");
+					result = resolveLocalQueries(query.getSignal(), result);
 
-				Message msg = new Message(from, new QueryResultNodeMessage(
-						query.getQueryId(), result));
+					nodeLogger.log("Responding remote queries from " + from
+							+ " " + result);
 
-				if (node.getChannel().isConnected()) {
-					try {
-						node.getChannel().send(msg);
-					} catch (Exception e) {
-						e.printStackTrace();
+					Message msg = new Message(from, new QueryResultNodeMessage(
+							query.getQueryId(), result));
+
+					if (node.getChannel().isConnected()) {
+						try {
+							node.getChannel().send(msg);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
 					}
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
 			}
 		});
@@ -273,8 +278,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
+		Set<Signal> copy = new HashSet<Signal>(querySignals);
+		final List<SearchCall> queries = new ArrayList<>();
 
-		List<SearchCall> queries = new ArrayList<>();
+		nodeLogger.log("Exploring on " + querySignals.size());
+
 		for (int i = 0; i < threads; i++) {
 			queries.add(new SearchCall(querySignals, signal));
 		}
@@ -292,6 +300,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 		} catch (InterruptedException | ExecutionException e) {
 			e.printStackTrace();
 		}
+
+		if (result.size() == 1) {
+			nodeLogger.log("I scanned " + copy.size() + " signals");
+		}
+
 		return result;
 	}
 

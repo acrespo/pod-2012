@@ -56,8 +56,11 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 	@Override
 	public void receive(final Message msg) {
-		if (msg.getObject() instanceof GlobalSyncNodeMessage) {
-
+		if (msg.getObject() instanceof MemberWelcomeNodeMessage) {
+			MemberWelcomeNodeMessage message = (MemberWelcomeNodeMessage) msg
+					.getObject();
+			handleNewNodeCallback(message.getAllMembers(), message.getDestinations());
+		} else if (msg.getObject() instanceof GlobalSyncNodeMessage) {
 			// If the message is a globalsync, we might not have our view info
 			// ready. So we must take that into account.
 			safelyProcess(msg);
@@ -131,27 +134,22 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// If we're a new node we tell we're no longer one
 		// After we got all the messages from all our neighbours
 
-		if (node.isNew()) {
-			nodeLogger.log("Msg came from " + msg.getSrc());
-		}
-
-		handleNewNodeCallback(message);
+		handleNewNodeCallback(message.getAllMembers(),
+				message.getDestinations());
 
 		// nodeLogger.log("We are done!");
 	}
 
 	private synchronized void handleNewNodeCallback(
-			final GlobalSyncNodeMessage message) {
+			final List<Address> allMembers, final Set<Address> destinations) {
 		if (node.isNew()) {
 			newNodePartsCount.addAndGet(1);
-			nodeLogger.log("New node check");
-			if (newNodePartsCount.get() == message.getAllMembers().size()
-					- message.getDestinations().size()) {
+			if (newNodePartsCount.get() == allMembers.size()
+					- destinations.size()) {
 				final Message newNodeReply = new Message(null);
 				newNodeReply.setObject(new NewNodeReadyMessage());
 				sendSafeAnswer(newNodeReply);
 				node.setIsNew(false);
-				nodeLogger.log("New node callback");
 				updateService.allowSync();
 			}
 

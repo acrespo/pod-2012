@@ -30,6 +30,10 @@ public class NodeTestController {
 		return signalNodeTestFactory.getNewSignalNode(getListener());
 	}
 
+	public String getChannelName() {
+		return "testChannel-" + channelNumber;
+	}
+
 	/**
 	 * Must disconnect all processors and block until it's done.
 	 */
@@ -97,10 +101,6 @@ public class NodeTestController {
 
 		for (int i = nodesToTest.size(); i < nodes.size() + nodesToTest.size(); i++) {
 			sum += i;
-		}
-
-		if (nodesToTest.size() == 0) {
-			sum = 0;
 		}
 
 		System.out.println("Awaiting for " + sum);

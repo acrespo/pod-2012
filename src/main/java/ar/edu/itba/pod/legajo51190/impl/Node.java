@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nullable;
@@ -41,6 +42,7 @@ public class Node implements JGroupNode {
 	private final AtomicBoolean online = new AtomicBoolean(false);
 	private final JGroupSignalProcessor signalProcessor;
 	private boolean isNew = true;
+	private final Semaphore newNodeSemaphore = new Semaphore(0);
 
 	public Node(final NodeListener listener,
 			final JGroupSignalProcessor signalProcessor) throws Exception {
@@ -177,6 +179,10 @@ public class Node implements JGroupNode {
 
 	public boolean isNew() {
 		return isNew;
+	}
+
+	public Semaphore getNewSemaphore() {
+		return newNodeSemaphore;
 	}
 
 }

@@ -10,7 +10,6 @@ import java.util.TimerTask;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,8 +28,6 @@ import com.google.common.collect.Sets;
 public class NodeUpdateService {
 
 	private static final int CHUNK_SIZE = 5000;
-
-	private final Semaphore newNodeSemaphore = new Semaphore(0);
 
 	/**
 	 * Represents the addresses awaiting for response when a synchronization
@@ -145,8 +142,8 @@ public class NodeUpdateService {
 
 							if (node.getToDistributeSignals().isEmpty()
 									&& node.getListener() != null) {
-								synchronized (this) {
-									notifyAll();
+								synchronized (node.getToDistributeSignals()) {
+									node.getToDistributeSignals().notifyAll();
 								}
 								node.getListener().onNodeSyncDone();
 							}
@@ -179,19 +176,19 @@ public class NodeUpdateService {
 
 					if (new_view.getMembers().size() == 1) {
 						node.setIsNew(false);
-						newNodeSemaphore.release();
+						node.getNewSemaphore().release();
 					}
 
-					if (node.getLastView() != null
-							&& node.getToDistributeSignals().size() == 0) {
+					if (node.getLastView() != null) {
 
 						// If we are distributing signals we have to wait
 						// For the distribution to be done
-						if (node.getToDistributeSignals().size() > 0) {
-							synchronized (this) {
-								this.wait(120000);
+						synchronized (node.getToDistributeSignals()) {
+							while (node.getToDistributeSignals().size() > 0) {
+								node.getToDistributeSignals().wait(1000);
 							}
 						}
+
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
@@ -199,16 +196,18 @@ public class NodeUpdateService {
 							resolveGoneMembers(goneMembers,
 									new_view.getMembers());
 						}
-						nodeLogger.log("Im waiting to be able to sync");
-						newNodeSemaphore.acquire();
-						nodeLogger.log("I can sync! NOW");
+
+						// TODO: Ver que hacer si somos nuevos y no nos mandan
+						// nada.
+						node.getNewSemaphore().acquire();
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
 
-							Set<Signal> signalsCopy = null;
 							synchronized (node.getLocalSignals()) {
-								signalsCopy = new HashSet<>(node
-										.getLocalSignals());
+								synchronized (node.getRedistribuitionSignals()) {
+									node.getRedistribuitionSignals().addAll(
+											node.getLocalSignals());
+								}
 							}
 
 							Multimap<Address, Signal> copyOfBackupSignals = null;
@@ -237,7 +236,8 @@ public class NodeUpdateService {
 								Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
 										.create();
 
-								prepareChunkOfData(signalsCopy,
+								prepareChunkOfData(
+										node.getRedistribuitionSignals(),
 										copyOfBackupSignals, k,
 										signalsCopyToSend,
 										copyOfBackupSignalsToSend);
@@ -249,7 +249,8 @@ public class NodeUpdateService {
 										copyOfBackupSignalsToSend);
 
 								if (isOK) {
-									removeCopyData(signalsCopy,
+									removeCopyData(
+											node.getRedistribuitionSignals(),
 											copyOfBackupSignals,
 											signalsCopyToSend,
 											copyOfBackupSignalsToSend);
@@ -257,11 +258,11 @@ public class NodeUpdateService {
 									break;
 								}
 							} while (copyOfBackupSignals.size() > 0
-									|| signalsCopy.size() > 0);
+									|| node.getRedistribuitionSignals().size() > 0);
 
 							if (isOK) {
 
-								nodeLogger.log("Sent sync data and awaiting!");
+								nodeLogger.log("Awaiting ...");
 								if (!newMemberLatch.await(100000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
@@ -275,8 +276,8 @@ public class NodeUpdateService {
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!! 2");
 								} else {
-									nodeLogger.log("New node sync call for "
-											+ newMembers.toString());
+
+									node.getRedistribuitionSignals().clear();
 								}
 							} else {
 								List<Address> allMinusWaiting = new ArrayList<>(
@@ -288,11 +289,28 @@ public class NodeUpdateService {
 							}
 
 							if (node.getListener() != null) {
+								nodeLogger.log("New node sync call for "
+										+ newMembers.toString());
 								node.getListener().onNodeSyncDone();
 							}
 
+						} else if (newMembers.size() > 0) {
+							for (Address address : newMembers) {
+								Message msg = new Message(address,
+										new MemberWelcomeNodeMessage(
+												newMembers, new_view
+														.getMembers()));
+								node.getChannel().send(msg);
+							}
+
+							if (node.getListener() != null) {
+								nodeLogger.log("New node sync call for "
+										+ newMembers.toString());
+								node.getListener().onNodeSyncDone();
+							}
 						}
-						newNodeSemaphore.release();
+
+						node.getNewSemaphore().release();
 					}
 
 					node.setNodeView(new_view);
@@ -484,7 +502,7 @@ public class NodeUpdateService {
 			}
 			waitingAddresses.addAll(receptors);
 		} catch (Exception e) {
-			e.printStackTrace();
+			return false;
 		}
 
 		return handleTimeouts(signalsToSend, backupSignalsToSend, copyMode,
@@ -496,30 +514,11 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers) {
 		try {
-			if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
-				throw new Exception("First timeout");
+			if (!ackLatch.await(15000, TimeUnit.MILLISECONDS)) {
+				throw new Exception("Timeout");
 			}
 		} catch (Exception e) {
-			for (Address address : waitingAddresses) {
-				if (node.isOnline()) {
-					sendSyncMessageToAddress(signalsToSend,
-							backupSignalsToSend, copyMode, allMembers, address);
-				}
-			}
-
-			if (node.isOnline()) {
-				ackLatch = new CountDownLatch(waitingAddresses.size());
-
-				try {
-					if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
-						throw new Exception(
-								"Second timeout, some nodes are not answering");
-					}
-				} catch (Exception e1) {
-					return false;
-				}
-			}
-
+			return false;
 		}
 		return true;
 	}
@@ -558,16 +557,13 @@ public class NodeUpdateService {
 			nodeLogger
 					.log("More than one member is gone, we might have lost messages :(");
 		}
+
+		Set<Signal> signalsCopy = null;
 		synchronized (node.getBackupSignals()) {
 			synchronized (node.getLocalSignals()) {
 				synchronized (node.getToDistributeSignals()) {
 					synchronized (node.getRedistribuitionSignals()) {
 						for (Address address : goneMembers) {
-							nodeLogger.log("Recovering backups from "
-									+ address.toString()
-									+ " size: "
-									+ node.getBackupSignals().get(address)
-											.size());
 							node.getRedistribuitionSignals().addAll(
 									node.getBackupSignals().get(address));
 						}
@@ -578,18 +574,13 @@ public class NodeUpdateService {
 						node.getBackupSignals().clear();
 						node.getLocalSignals().clear();
 						node.getToDistributeSignals().clear();
+						signalsCopy = new HashSet<>(
+								node.getRedistribuitionSignals());
 						timerEnabled.set(false);
 					}
 				}
 			}
 		}
-
-		Set<Signal> signalsCopy = null;
-		synchronized (node.getRedistribuitionSignals()) {
-			signalsCopy = new HashSet<>(node.getRedistribuitionSignals());
-		}
-
-		System.out.println("Total redistribution size: " + signalsCopy.size());
 
 		Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
 				.create(node.getBackupSignals());
@@ -608,9 +599,6 @@ public class NodeUpdateService {
 			prepareChunkOfData(signalsCopy, copyOfBackupSignals, k,
 					signalsCopyToSend, copyOfBackupSignalsToSend);
 
-			nodeLogger.log("Sending nodes..."
-					+ (signalsCopyToSend.size() + copyOfBackupSignalsToSend
-							.size()));
 			syncMembers(allMembersButMyself, allMembers, signalsCopyToSend,
 					copyOfBackupSignalsToSend);
 
@@ -714,6 +702,6 @@ public class NodeUpdateService {
 	}
 
 	public void allowSync() {
-		newNodeSemaphore.release(10000);
+		node.getNewSemaphore().release(Integer.MAX_VALUE - 1);
 	}
 }
