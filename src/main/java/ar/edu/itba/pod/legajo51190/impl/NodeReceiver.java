@@ -7,7 +7,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jgroups.Address;
@@ -36,7 +35,6 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private final ExecutorService connectionService;
 	private final NodeLogger nodeLogger;
 	private final AtomicInteger newNodePartsCount = new AtomicInteger(0);
-	private final AtomicBoolean isNewNode = new AtomicBoolean(true);
 
 	public NodeReceiver(final Node node) {
 		this.node = node;

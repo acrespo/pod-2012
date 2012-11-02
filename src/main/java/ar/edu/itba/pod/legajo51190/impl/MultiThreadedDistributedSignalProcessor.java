@@ -72,7 +72,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 	private final ConcurrentHashMap<Integer, RemoteQuery> queries;
 	private final AtomicInteger awaitQueryCount = new AtomicInteger(0);
 	private final AtomicInteger queryIdGenerator = new AtomicInteger(0);
-	@SuppressWarnings("unused")
 	private final NodeLogger nodeLogger;
 
 	public MultiThreadedDistributedSignalProcessor(final int threads)

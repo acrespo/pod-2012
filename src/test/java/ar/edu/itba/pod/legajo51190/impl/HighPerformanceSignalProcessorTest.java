@@ -53,6 +53,7 @@ public class HighPerformanceSignalProcessorTest {
 	}
 
 	@Test
+	@Ignore
 	public void testMultipleAddConsistency() {
 
 		controller.addNewNodes(2);
@@ -73,7 +74,6 @@ public class HighPerformanceSignalProcessorTest {
 	}
 
 	@Test
-	@Ignore
 	public void testDuringAddConsistency() throws InterruptedException {
 
 		final AtomicInteger finishedCount = new AtomicInteger(0);
