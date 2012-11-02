@@ -178,7 +178,6 @@ public class NodeUpdateService {
 				try {
 
 					if (new_view.getMembers().size() == 1) {
-						nodeLogger.log("Im the first node!");
 						node.setIsNew(false);
 						newNodeSemaphore.release();
 					}
@@ -200,8 +199,7 @@ public class NodeUpdateService {
 							resolveGoneMembers(goneMembers,
 									new_view.getMembers());
 						}
-						nodeLogger.log("Im waiting to be able to sync "
-								+ new_view);
+						nodeLogger.log("Im waiting to be able to sync");
 						newNodeSemaphore.acquire();
 						nodeLogger.log("I can sync! NOW");
 						if (newMembers.size() > 0
