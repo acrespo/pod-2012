@@ -132,6 +132,11 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 		// If we're a new node we tell we're no longer one
 		// After we got all the messages from all our neighbours
+
+		if (node.isNew()) {
+			nodeLogger.log("Msg came from " + msg.getSrc());
+		}
+
 		handleNewNodeCallback(message);
 
 		// nodeLogger.log("We are done!");
