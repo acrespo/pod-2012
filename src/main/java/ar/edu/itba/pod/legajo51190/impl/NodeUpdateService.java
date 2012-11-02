@@ -195,8 +195,8 @@ public class NodeUpdateService {
 									new_view.getMembers());
 						}
 						if (newMembers.size() > 0
-								&& node.getLocalSignals().size() > 0
-								|| node.isNew()) {
+								&& (node.getLocalSignals().size() > 0 || node
+										.isNew())) {
 							nodeLogger.log("Im waiting to be able to sync");
 							newNodeSemaphore.acquire();
 							nodeLogger.log("I can sync! NOW");
