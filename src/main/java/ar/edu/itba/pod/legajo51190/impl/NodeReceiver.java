@@ -146,7 +146,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 				final Message newNodeReply = new Message(null);
 				newNodeReply.setObject(new NewNodeReadyMessage());
 				sendSafeAnswer(newNodeReply);
-				isNewNode.set(true);
+				isNewNode.set(false);
 				nodeLogger.log("New node callback");
 				updateService.allowSync();
 			}
