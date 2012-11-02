@@ -59,7 +59,7 @@ public class NodeUpdateService {
 	 * Latch for awaiting the signal from the rest of the nodes of the group on
 	 * the notification of readyness after a gone member
 	 */
-	private CountDownLatch memberGoneLatch;
+	private CountDownLatch memberSyncLatch;
 	/**
 	 * Timer that polls the "to distribute signals" for new elements in order to
 	 * send them.
@@ -215,6 +215,15 @@ public class NodeUpdateService {
 
 							newMemberLatch = new CountDownLatch(1);
 
+							List<Address> allSyncMembers = getAllNodesButMe(
+									node, new_view.getMembers());
+
+							allSyncMembers.removeAll(newMembers);
+							allSyncMembers.removeAll(goneMembers);
+
+							memberSyncLatch = new CountDownLatch(allSyncMembers
+									.size());
+
 							boolean isOK = true;
 							do {
 								int k = 0;
@@ -249,6 +258,15 @@ public class NodeUpdateService {
 								if (!newMemberLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
+								}
+
+								if (node.isOnline()) {
+									tellOtherNodesImDoneRedistributingData();
+								}
+
+								if (!memberSyncLatch.await(10000,
+										TimeUnit.MILLISECONDS)) {
+									nodeLogger.log("TIMEOUTED!!! 2");
 								} else {
 									nodeLogger.log("New node sync call for "
 											+ newMembers.toString());
@@ -576,7 +594,7 @@ public class NodeUpdateService {
 
 		List<Address> allMembersButMyself = getAllNodesButMe(node, allMembers);
 
-		memberGoneLatch = new CountDownLatch(allMembersButMyself.size());
+		memberSyncLatch = new CountDownLatch(allMembersButMyself.size());
 
 		do {
 			int k = 0;
@@ -603,7 +621,7 @@ public class NodeUpdateService {
 		}
 
 		try {
-			memberGoneLatch.await(10000, TimeUnit.MILLISECONDS);
+			memberSyncLatch.await(10000, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -619,7 +637,7 @@ public class NodeUpdateService {
 
 	private void tellOtherNodesImDoneRedistributingData() {
 
-		Message tellImDone = new Message(null, new GoneMessageSentNodeMessage());
+		Message tellImDone = new Message(null, new SyncDoneNodeMessage());
 
 		try {
 			node.getChannel().send(tellImDone);
@@ -687,13 +705,13 @@ public class NodeUpdateService {
 		}
 	}
 
-	public void notifyGoneMessage() {
-		if (memberGoneLatch != null) {
-			memberGoneLatch.countDown();
+	public void notifySyncMessage() {
+		if (memberSyncLatch != null) {
+			memberSyncLatch.countDown();
 		}
 	}
 
 	public void allowSync() {
-		newNodeSemaphore.release();
+		newNodeSemaphore.release(10000);
 	}
 }
