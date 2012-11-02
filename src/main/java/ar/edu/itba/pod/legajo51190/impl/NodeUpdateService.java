@@ -255,7 +255,7 @@ public class NodeUpdateService {
 									|| signalsCopy.size() > 0);
 
 							if (isOK) {
-								if (!newMemberLatch.await(10000,
+								if (!newMemberLatch.await(100000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
 								}
@@ -264,7 +264,7 @@ public class NodeUpdateService {
 									tellOtherNodesImDoneRedistributingData();
 								}
 
-								if (!memberSyncLatch.await(10000,
+								if (!memberSyncLatch.await(100000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!! 2");
 								} else {
