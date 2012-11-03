@@ -236,6 +236,8 @@ public class NodeUpdateService {
 							memberSyncLatch = new CountDownLatch(allSyncMembers
 									.size());
 
+							node.setNodeView(new_view);
+
 							boolean isOK = true;
 							do {
 								int k = 0;
@@ -299,7 +301,6 @@ public class NodeUpdateService {
 							System.out.println(node.getAddress()
 									+ ": Done with new view!");
 
-							node.setNodeView(new_view);
 							node.getRedistributionSignals().clear();
 
 						} else if (newMembers.size() > 0) {
@@ -539,7 +540,7 @@ public class NodeUpdateService {
 				ackLatch = new CountDownLatch(waitingAddresses.size());
 
 				try {
-					if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
+					if (!ackLatch.await(30000, TimeUnit.MILLISECONDS)) {
 						throw new Exception(
 								"Second timeout, some nodes are not answering");
 					}
