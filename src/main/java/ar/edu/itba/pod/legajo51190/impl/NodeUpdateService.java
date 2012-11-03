@@ -313,6 +313,8 @@ public class NodeUpdateService {
 														.getMembers()));
 								node.getChannel().send(msg);
 							}
+							nodeLogger.log("Told new nodes to join: "
+									+ newMembers);
 
 							if (node.getListener() != null) {
 								nodeLogger.log("New node sync call for "
