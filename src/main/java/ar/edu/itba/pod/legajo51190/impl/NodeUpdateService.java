@@ -494,7 +494,6 @@ public class NodeUpdateService {
 		try {
 
 			for (Address receptor : receptors) {
-				nodeLogger.log("Sent data to " + receptor);
 				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
 						copyMode, allMembers, receptor);
 			}
@@ -525,11 +524,29 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers) {
 		try {
-			if (!ackLatch.await(30000, TimeUnit.MILLISECONDS)) {
+			if (!ackLatch.await(5000, TimeUnit.MILLISECONDS)) {
 				throw new Exception("Timeout");
 			}
 		} catch (Exception e) {
-			return false;
+			for (Address address : waitingAddresses) {
+				if (node.isOnline()) {
+					sendSyncMessageToAddress(signalsToSend,
+							backupSignalsToSend, copyMode, allMembers, address);
+				}
+			}
+
+			if (node.isOnline()) {
+				ackLatch = new CountDownLatch(waitingAddresses.size());
+
+				try {
+					if (!ackLatch.await(10000, TimeUnit.MILLISECONDS)) {
+						throw new Exception(
+								"Second timeout, some nodes are not answering");
+					}
+				} catch (Exception e1) {
+					return false;
+				}
+			}
 		}
 		return true;
 	}
