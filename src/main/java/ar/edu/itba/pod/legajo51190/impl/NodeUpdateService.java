@@ -564,16 +564,25 @@ public class NodeUpdateService {
 		if (node.isOnline()) {
 			try {
 				Multimap<Address, Signal> signalsBackup;
-				if (!signalsToSend.keySet().contains(address)) {
+				if (copyMode) {
 					signalsBackup = HashMultimap.create();
 					signalsBackup.putAll(address,
 							backupSignalsToSend.get(address));
 				} else {
 					signalsBackup = backupSignalsToSend;
 				}
+
+				Multimap<Address, Signal> signalsSending;
+				if (signalsToSend.keySet().contains(address)) {
+					signalsSending = HashMultimap.create();
+					signalsSending.putAll(address, signalsToSend.get(address));
+				} else {
+					signalsSending = signalsToSend;
+				}
+
 				node.getChannel().send(
 						new Message(address, new GlobalSyncNodeMessage(
-								signalsToSend, signalsBackup, copyMode,
+								signalsSending, signalsBackup, copyMode,
 								allMembers)));
 			} catch (Exception e1) {
 				if (node.isOnline()) {

@@ -201,7 +201,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		try {
 			RemoteQuery query = queries.get(queryId);
 			if (!query.getLatch().await(10000, TimeUnit.MILLISECONDS)) {
-				return result;
+				return null;
 			}
 
 			for (Result res : query.getResults()) {
