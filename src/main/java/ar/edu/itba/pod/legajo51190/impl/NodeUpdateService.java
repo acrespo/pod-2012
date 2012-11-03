@@ -494,6 +494,7 @@ public class NodeUpdateService {
 		try {
 
 			for (Address receptor : receptors) {
+				nodeLogger.log("Sent data to " + receptor);
 				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
 						copyMode, allMembers, receptor);
 			}
