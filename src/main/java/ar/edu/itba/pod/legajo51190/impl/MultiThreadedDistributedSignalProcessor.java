@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -61,7 +60,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 	}
 
 	private final Semaphore sem = new Semaphore(0);
-	private final ThreadPoolExecutor localProcessingService;
+	private final ExecutorService localProcessingService;
 	private final ExecutorService requestProcessingService;
 	private final int threads;
 	private final NodeReceiver networkState;
@@ -83,13 +82,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		this.threads = threads;
 		queries = new ConcurrentHashMap<>();
 		requestProcessingService = Executors.newCachedThreadPool();
-		localProcessingService = new ThreadPoolExecutor(1, 1, 1,
-				TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>()) {
-			@Override
-			protected void afterExecute(final Runnable r, final Throwable t) {
-
-			}
-		};
+		localProcessingService = Executors.newFixedThreadPool(threads);
 
 		node = new Node(nodeListener, this);
 		networkState = new NodeReceiver(node, this);
@@ -287,7 +280,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
-		Set<Signal> copy = new HashSet<Signal>(querySignals);
 		final List<SearchCall> queries = new ArrayList<>();
 
 		for (int i = 0; i < threads; i++) {
@@ -307,8 +299,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 		} catch (InterruptedException | ExecutionException e) {
 			e.printStackTrace();
 		}
-
-		System.out.println(node.getAddress() + " Exploring on " + copy.size());
 
 		return result;
 	}

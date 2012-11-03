@@ -567,6 +567,10 @@ public class NodeUpdateService {
 				if (copyMode) {
 					signalsBackup = HashMultimap.create();
 					signalsBackup.putAll(address,
+							backupSignalsToSend.get(node.getAddress()));
+				} else if (signalsToSend.keySet().contains(address)) {
+					signalsBackup = HashMultimap.create();
+					signalsBackup.putAll(address,
 							backupSignalsToSend.get(address));
 				} else {
 					signalsBackup = backupSignalsToSend;
