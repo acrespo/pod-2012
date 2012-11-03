@@ -203,18 +203,11 @@ public class NodeUpdateService {
 									new_view.getMembers());
 						}
 
-						// TODO: Ver que hacer si somos nuevos y no nos mandan
-						// nada.
+						nodeLogger.log("Awaiting for my join to the group...");
 						node.getNewSemaphore().acquire();
+						nodeLogger.log("GOT IT!...");
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
-
-							// synchronized (processor) {
-							// if (processor.isWorking()) {
-							// processor.wait(); // Await for all tasks
-							// // done!
-							// }
-							// }
 
 							final Set<Signal> signalsCopy = new HashSet<>();
 							synchronized (node.getLocalSignals()) {
