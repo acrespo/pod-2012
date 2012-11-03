@@ -180,6 +180,8 @@ public class NodeUpdateService {
 			public void run() {
 				try {
 
+					nodeLogger.log("My view:" + new_view);
+
 					if (new_view.getMembers().size() == 1) {
 						node.setIsNew(false);
 						node.getNewSemaphore().release();
