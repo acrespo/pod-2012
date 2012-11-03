@@ -36,9 +36,13 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	private final NodeLogger nodeLogger;
 	private final AtomicInteger newNodePartsCount = new AtomicInteger(0);
 
-	public NodeReceiver(final Node node) {
+	public NodeReceiver(
+			final Node node,
+			final MultiThreadedDistributedSignalProcessor multiThreadedDistributedSignalProcessor) {
 		this.node = node;
-		updateService = new NodeUpdateService(node);
+
+		updateService = new NodeUpdateService(node,
+				multiThreadedDistributedSignalProcessor);
 		connectionService = Executors.newCachedThreadPool();
 		connectionPendingTasks = new LinkedBlockingQueue<>();
 		nodeLogger = new NodeLogger(node);
@@ -59,7 +63,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		if (msg.getObject() instanceof MemberWelcomeNodeMessage) {
 			MemberWelcomeNodeMessage message = (MemberWelcomeNodeMessage) msg
 					.getObject();
-			handleNewNodeCallback(message.getAllMembers(), message.getDestinations());
+			handleNewNodeCallback(message.getAllMembers(),
+					message.getDestinations());
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessage) {
 			// If the message is a globalsync, we might not have our view info
 			// ready. So we must take that into account.

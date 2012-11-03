@@ -33,7 +33,7 @@ public interface JGroupNode {
 
 	public Set<Signal> getLocalSignals();
 
-	public Set<Signal> getRedistribuitionSignals();
+	public Set<Signal> getRedistributionSignals();
 
 	public Set<Signal> getToDistributeSignals();
 

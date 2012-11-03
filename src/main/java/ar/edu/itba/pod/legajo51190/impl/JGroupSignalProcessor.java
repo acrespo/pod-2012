@@ -28,4 +28,10 @@ public interface JGroupSignalProcessor {
 	 * Tells the signal processor that all the fallen nodes are fixed
 	 */
 	public void onNodeGoneFixed();
+
+	/**
+	 * Tells if the processor is thinking, and we should not modify the signals
+	 * count yet
+	 */
+	public boolean isWorking();
 }

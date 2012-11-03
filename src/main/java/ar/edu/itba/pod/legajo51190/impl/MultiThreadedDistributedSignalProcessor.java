@@ -2,6 +2,7 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,9 +30,6 @@ import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
-
 /**
  * SignalProcessor implementation
  * 
@@ -40,22 +39,20 @@ public class MultiThreadedDistributedSignalProcessor implements
 		JGroupSignalProcessor, SignalProcessor, SPNode {
 
 	private static class RemoteQuery {
-		private final CountDownLatch awaits;
+		private final CountDownLatch latch;
 		private final Set<Address> remoteNodes;
 		private final Set<Result> results;
 
 		public RemoteQuery(final Set<Address> allButMe) {
-			remoteNodes = allButMe;
+			remoteNodes = Collections
+					.newSetFromMap(new ConcurrentHashMap<Address, Boolean>());
+			remoteNodes.addAll(allButMe);
 			results = new HashSet<>();
-			awaits = new CountDownLatch(allButMe.size());
+			latch = new CountDownLatch(allButMe.size());
 		}
 
-		public CountDownLatch getAwaits() {
-			return awaits;
-		}
-
-		public Set<Address> getRemoteNodes() {
-			return remoteNodes;
+		public CountDownLatch getLatch() {
+			return latch;
 		}
 
 		public Set<Result> getResults() {
@@ -64,12 +61,13 @@ public class MultiThreadedDistributedSignalProcessor implements
 	}
 
 	private final Semaphore sem = new Semaphore(0);
-	private final ListeningExecutorService localProcessingService;
+	private final ThreadPoolExecutor localProcessingService;
 	private final ExecutorService requestProcessingService;
 	private final int threads;
 	private final NodeReceiver networkState;
 	private final Node node;
 	private final ConcurrentHashMap<Integer, RemoteQuery> queries;
+	private final AtomicInteger processingCount = new AtomicInteger(0);
 	private final AtomicInteger awaitQueryCount = new AtomicInteger(0);
 	private final AtomicInteger queryIdGenerator = new AtomicInteger(0);
 	private final NodeLogger nodeLogger;
@@ -85,10 +83,16 @@ public class MultiThreadedDistributedSignalProcessor implements
 		this.threads = threads;
 		queries = new ConcurrentHashMap<>();
 		requestProcessingService = Executors.newCachedThreadPool();
-		localProcessingService = MoreExecutors.listeningDecorator(Executors
-				.newFixedThreadPool(threads));
+		localProcessingService = new ThreadPoolExecutor(1, 1, 1,
+				TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>()) {
+			@Override
+			protected void afterExecute(final Runnable r, final Throwable t) {
+
+			}
+		};
+
 		node = new Node(nodeListener, this);
-		networkState = new NodeReceiver(node);
+		networkState = new NodeReceiver(node, this);
 		node.getChannel().setDiscardOwnMessages(true);
 
 		if (networkState != null) {
@@ -116,8 +120,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		Set<Address> allButMe = new HashSet<>(node.getAliveNodes());
 		allButMe.remove(node.getAddress());
+		System.out.println(node.getAddress() + ": Asking to " + allButMe);
+
 		queries.put(queryId, new RemoteQuery(allButMe));
-		Message msg = new Message(null, new QueryNodeMessage(signal, queryId));
+		Message msg = new Message(null, new QueryNodeMessage(signal, queryId,
+				allButMe));
 		if (node.isOnline() && node.getChannel().isConnected()) {
 			try {
 				node.getChannel().send(msg);
@@ -129,18 +136,18 @@ public class MultiThreadedDistributedSignalProcessor implements
 	}
 
 	private BlockingQueue<Signal> buildQuerySignalSet() {
-		final BlockingQueue<Signal> querySignals = new LinkedBlockingQueue<>();
 
+		Set<Signal> sigs = new HashSet<>();
 		synchronized (node.getToDistributeSignals()) {
 			synchronized (node.getLocalSignals()) {
-				synchronized (node.getRedistribuitionSignals()) {
-					querySignals.addAll(node.getToDistributeSignals());
-					querySignals.addAll(node.getRedistribuitionSignals());
-					querySignals.addAll(node.getLocalSignals());
+				synchronized (node.getRedistributionSignals()) {
+					sigs.addAll(node.getToDistributeSignals());
+					sigs.addAll(node.getRedistributionSignals());
+					sigs.addAll(node.getLocalSignals());
 				}
 			}
 		}
-		return querySignals;
+		return new LinkedBlockingQueue<>(sigs);
 	}
 
 	@Override
@@ -200,7 +207,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 	private Result awaitRemoteAnswers(Result result, final int queryId) {
 		try {
 			RemoteQuery query = queries.get(queryId);
-			if (!query.getAwaits().await(10000, TimeUnit.MILLISECONDS)) {
+			if (!query.getLatch().await(10000, TimeUnit.MILLISECONDS)) {
 				return result;
 			}
 
@@ -238,6 +245,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 	@Override
 	public void onQueryReception(final QueryNodeMessage query,
 			final Address from) {
+		// if (!query.getReceiptMembers().contains(node.getAddress())) {
+		// return;
+		// }
+
 		requestProcessingService.submit(new Runnable() {
 			@Override
 			public void run() {
@@ -245,9 +256,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 					Result result = new Result(query.getSignal());
 
 					result = resolveLocalQueries(query.getSignal(), result);
-
-					nodeLogger.log("Responding remote queries from " + from
-							+ " " + result);
 
 					Message msg = new Message(from, new QueryResultNodeMessage(
 							query.getQueryId(), result));
@@ -271,17 +279,16 @@ public class MultiThreadedDistributedSignalProcessor implements
 	public void onResultReception(final QueryResultNodeMessage answer,
 			final Address from) {
 		RemoteQuery query = queries.get(answer.getMessageId());
-		query.getResults().add(answer.getResult());
-		query.getRemoteNodes().remove(from);
-		query.getAwaits().countDown();
+		if (query.remoteNodes.contains(from)) {
+			query.getResults().add(answer.getResult());
+			query.getLatch().countDown();
+		}
 	}
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 		Set<Signal> copy = new HashSet<Signal>(querySignals);
 		final List<SearchCall> queries = new ArrayList<>();
-
-		nodeLogger.log("Exploring on " + querySignals.size());
 
 		for (int i = 0; i < threads; i++) {
 			queries.add(new SearchCall(querySignals, signal));
@@ -301,9 +308,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 			e.printStackTrace();
 		}
 
-		if (result.size() == 1) {
-			nodeLogger.log("I scanned " + copy.size() + " signals");
-		}
+		System.out.println(node.getAddress() + " Exploring on " + copy.size());
 
 		return result;
 	}
@@ -312,5 +317,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 	public void onNodeGoneFixed() {
 		System.out.println("GONE NODE FIXED!");
 		sem.release(awaitQueryCount.getAndSet(0));
+	}
+
+	@Override
+	public boolean isWorking() {
+		return processingCount.get() == 0;
 	}
 }

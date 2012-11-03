@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Assert;
@@ -82,7 +83,7 @@ public class HighPerformanceSignalProcessorTest {
 		final SignalNode first = controller.getNodesToTest().getFirst();
 		final Signal sig = src.next();
 
-		controller.addSignalsToNode(first, 10000);
+		controller.addSignalsToNode(first, 500);
 
 		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
 
@@ -95,6 +96,7 @@ public class HighPerformanceSignalProcessorTest {
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
+		final AtomicBoolean mustQuit = new AtomicBoolean(false);
 
 		final SignalNode lastNode = node;
 
@@ -102,14 +104,14 @@ public class HighPerformanceSignalProcessorTest {
 			@Override
 			public void run() {
 				Result last = null;
-				while (!Thread.interrupted()) {
+				while (!mustQuit.get()) {
 
 					try {
 						Result newResult = first.findSimilarTo(sig);
-						System.out.println("====== I GOT A RESULT!!!!");
-						if (last != null) {
+						// System.out.println("====== I GOT A RESULT!!!!");
+						if (last != null && !mustQuit.get()) {
 							Assert.assertEquals(last, newResult);
-							System.out.println("They are equal");
+							// System.out.println("They are equal");
 						}
 						last = newResult;
 
@@ -125,14 +127,13 @@ public class HighPerformanceSignalProcessorTest {
 			@Override
 			public void run() {
 				Result last = null;
-				while (!Thread.interrupted()) {
-
+				while (!mustQuit.get()) {
 					try {
 						Result newResult = lastNode.findSimilarTo(sig);
-						System.out.println("====== I GOT A RESULT!!!!");
-						if (last != null) {
+						// System.out.println("====== I GOT A RESULT!!!!");
+						if (last != null && !mustQuit.get()) {
 							Assert.assertEquals(last, newResult);
-							System.out.println("They are equal");
+							// System.out.println("They are equal");
 						}
 						last = newResult;
 
@@ -155,14 +156,18 @@ public class HighPerformanceSignalProcessorTest {
 			throw new RuntimeException("Something didn't sync right");
 		} finally {
 			try {
-				Thread.sleep(10 * 1000);
+				Thread.sleep(5 * 1000);
+				System.out.println("Adding a new node");
 				controller.addNewNodes(1);
-				Thread.sleep(10 * 1000);
+				Thread.sleep(5 * 1000);
+				System.out.println("Adding a new node");
 				controller.addNewNodes(1);
-				Thread.sleep(10 * 1000);
+				Thread.sleep(5 * 1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} finally {
+				System.out.println("DONE!!!");
+				mustQuit.set(true);
 				t.interrupt();
 				t2.interrupt();
 			}

@@ -69,14 +69,20 @@ public class NodeUpdateService {
 	private final AtomicBoolean timerEnabled = new AtomicBoolean(true);
 	private final NodeLogger nodeLogger;
 
-	public NodeUpdateService(final Node node) {
+	private final JGroupSignalProcessor processor;
+
+	public NodeUpdateService(final Node node,
+			final JGroupSignalProcessor processor) {
 		this.node = node;
+		this.processor = processor;
 		nodeSyncService = new ThreadPoolExecutor(1, 1, 1, TimeUnit.MINUTES,
 				new LinkedBlockingQueue<Runnable>()) {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
-				node.setDegraded(getQueue().isEmpty());
-				timerEnabled.set(getQueue().isEmpty());
+				if (nodeSyncService.getActiveCount() == 0) {
+					node.setDegraded(getQueue().isEmpty());
+					timerEnabled.set(getQueue().isEmpty());
+				}
 			}
 		};
 
@@ -203,10 +209,19 @@ public class NodeUpdateService {
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
 
+							// synchronized (processor) {
+							// if (processor.isWorking()) {
+							// processor.wait(); // Await for all tasks
+							// // done!
+							// }
+							// }
+
+							final Set<Signal> signalsCopy = new HashSet<>();
 							synchronized (node.getLocalSignals()) {
-								synchronized (node.getRedistribuitionSignals()) {
-									node.getRedistribuitionSignals().addAll(
+								synchronized (node.getRedistributionSignals()) {
+									node.getRedistributionSignals().addAll(
 											node.getLocalSignals());
+									signalsCopy.addAll(node.getLocalSignals());
 								}
 							}
 
@@ -228,6 +243,8 @@ public class NodeUpdateService {
 							memberSyncLatch = new CountDownLatch(allSyncMembers
 									.size());
 
+							node.setNodeView(new_view);
+
 							boolean isOK = true;
 							do {
 								int k = 0;
@@ -236,8 +253,7 @@ public class NodeUpdateService {
 								Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
 										.create();
 
-								prepareChunkOfData(
-										node.getRedistribuitionSignals(),
+								prepareChunkOfData(signalsCopy,
 										copyOfBackupSignals, k,
 										signalsCopyToSend,
 										copyOfBackupSignalsToSend);
@@ -249,8 +265,7 @@ public class NodeUpdateService {
 										copyOfBackupSignalsToSend);
 
 								if (isOK) {
-									removeCopyData(
-											node.getRedistribuitionSignals(),
+									removeCopyData(signalsCopy,
 											copyOfBackupSignals,
 											signalsCopyToSend,
 											copyOfBackupSignalsToSend);
@@ -258,7 +273,7 @@ public class NodeUpdateService {
 									break;
 								}
 							} while (copyOfBackupSignals.size() > 0
-									|| node.getRedistribuitionSignals().size() > 0);
+									|| signalsCopy.size() > 0);
 
 							if (isOK) {
 
@@ -275,9 +290,6 @@ public class NodeUpdateService {
 								if (!memberSyncLatch.await(100000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!! 2");
-								} else {
-
-									node.getRedistribuitionSignals().clear();
 								}
 							} else {
 								List<Address> allMinusWaiting = new ArrayList<>(
@@ -293,6 +305,10 @@ public class NodeUpdateService {
 										+ newMembers.toString());
 								node.getListener().onNodeSyncDone();
 							}
+							System.out.println(node.getAddress()
+									+ ": Done with new view!");
+
+							node.getRedistributionSignals().clear();
 
 						} else if (newMembers.size() > 0) {
 							for (Address address : newMembers) {
@@ -514,7 +530,7 @@ public class NodeUpdateService {
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers) {
 		try {
-			if (!ackLatch.await(15000, TimeUnit.MILLISECONDS)) {
+			if (!ackLatch.await(30000, TimeUnit.MILLISECONDS)) {
 				throw new Exception("Timeout");
 			}
 		} catch (Exception e) {
@@ -562,20 +578,20 @@ public class NodeUpdateService {
 		synchronized (node.getBackupSignals()) {
 			synchronized (node.getLocalSignals()) {
 				synchronized (node.getToDistributeSignals()) {
-					synchronized (node.getRedistribuitionSignals()) {
+					synchronized (node.getRedistributionSignals()) {
 						for (Address address : goneMembers) {
-							node.getRedistribuitionSignals().addAll(
+							node.getRedistributionSignals().addAll(
 									node.getBackupSignals().get(address));
 						}
-						node.getRedistribuitionSignals().addAll(
+						node.getRedistributionSignals().addAll(
 								node.getLocalSignals());
-						node.getRedistribuitionSignals().addAll(
+						node.getRedistributionSignals().addAll(
 								node.getToDistributeSignals());
 						node.getBackupSignals().clear();
 						node.getLocalSignals().clear();
 						node.getToDistributeSignals().clear();
 						signalsCopy = new HashSet<>(
-								node.getRedistribuitionSignals());
+								node.getRedistributionSignals());
 						timerEnabled.set(false);
 					}
 				}
@@ -616,11 +632,13 @@ public class NodeUpdateService {
 			e.printStackTrace();
 		}
 
-		node.getRedistribuitionSignals().clear();
+		node.getRedistributionSignals().clear();
 
 		if (node.getListener() != null) {
 			node.getListener().onNodeGoneSyncDone();
 		}
+
+		System.out.println("Gone members!" + goneMembers);
 		node.getSignalProcessor().onNodeGoneFixed();
 
 	}

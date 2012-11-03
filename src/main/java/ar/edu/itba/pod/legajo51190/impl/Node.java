@@ -124,8 +124,7 @@ public class Node implements JGroupNode {
 	public NodeStats getStats() {
 		// TODO: Improve nodestats implementation
 		return new NodeStats(getAddress().toString(), 0, signals.size()
-				+ toDistributeSignals.size() + redistributionSignals.size(),
-				backupSignals.size(), false);
+				+ toDistributeSignals.size(), backupSignals.size(), false);
 	}
 
 	@Override
@@ -134,7 +133,7 @@ public class Node implements JGroupNode {
 	}
 
 	@Override
-	public Set<Signal> getRedistribuitionSignals() {
+	public Set<Signal> getRedistributionSignals() {
 		return redistributionSignals;
 	}
 
@@ -158,10 +157,10 @@ public class Node implements JGroupNode {
 		online.set(false);
 		synchronized (getToDistributeSignals()) {
 			synchronized (getLocalSignals()) {
-				synchronized (getRedistribuitionSignals()) {
+				synchronized (getRedistributionSignals()) {
 					getLocalSignals().clear();
 					getToDistributeSignals().clear();
-					getRedistribuitionSignals().clear();
+					getRedistributionSignals().clear();
 				}
 			}
 		}
