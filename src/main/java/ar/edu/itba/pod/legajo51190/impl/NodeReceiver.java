@@ -122,8 +122,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 
 	private void onNewNodeSync(final Message msg,
 			final GlobalSyncNodeMessage message) {
-		// nodeLogger.log("Got data! " + message.getSignalsMap().size()
-		// + " signals " + message.getBackupSignals().size() + " backups");
+		nodeLogger.log("Got data! " + message.getSignalsMap().size()
+				+ " signals " + message.getBackupSignals().size() + " backups");
 
 		// We save the signals that were sent to us
 		storeLocalSignals(message);
