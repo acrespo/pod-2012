@@ -149,6 +149,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			final List<Address> allMembers, final Set<Address> destinations) {
 		if (node.isNew()) {
 			newNodePartsCount.addAndGet(1);
+			nodeLogger.log("New node check");
 			if (newNodePartsCount.get() == allMembers.size()
 					- destinations.size()) {
 				final Message newNodeReply = new Message(null);
