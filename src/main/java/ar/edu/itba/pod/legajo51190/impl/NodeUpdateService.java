@@ -564,11 +564,7 @@ public class NodeUpdateService {
 		if (node.isOnline()) {
 			try {
 				Multimap<Address, Signal> signalsBackup;
-				if (copyMode) {
-					signalsBackup = HashMultimap.create();
-					signalsBackup.putAll(address,
-							backupSignalsToSend.get(node.getAddress()));
-				} else if (signalsToSend.keySet().contains(address)) {
+				if (!signalsToSend.keySet().contains(address)) {
 					signalsBackup = HashMultimap.create();
 					signalsBackup.putAll(address,
 							backupSignalsToSend.get(address));
