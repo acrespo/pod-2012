@@ -164,6 +164,7 @@ public class Node implements JGroupNode {
 				}
 			}
 		}
+		getChannel().disconnect();
 		getChannel().close();
 	}
 
