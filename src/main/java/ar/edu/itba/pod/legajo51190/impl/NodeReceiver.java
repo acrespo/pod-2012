@@ -98,6 +98,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
 
 		} else {
+			nodeLogger.log("Submitted for future tasks!");
 			// Submit the task for further execution
 			connectionPendingTasks.add(new Callable<Void>() {
 				@Override
