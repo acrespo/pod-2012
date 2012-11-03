@@ -717,6 +717,7 @@ public class NodeUpdateService {
 	}
 
 	public void allowSync() {
+		nodeLogger.log("New node notification received!");
 		node.getNewSemaphore().release(Integer.MAX_VALUE - 1);
 	}
 }
