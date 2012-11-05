@@ -284,9 +284,9 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
 
-		// if (node.isNew()) {
-		// return new Result(signal);
-		// }
+		if (node.isNew()) {
+			return new Result(signal);
+		}
 
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 		final List<SearchCall> queries = new ArrayList<>();
@@ -309,10 +309,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		} catch (InterruptedException | ExecutionException e) {
 			e.printStackTrace();
-		}
-
-		if (result != null) {
-			nodeLogger.log(result.toString());
 		}
 
 		return result;
