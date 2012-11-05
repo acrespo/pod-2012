@@ -285,6 +285,8 @@ public class MultiThreadedDistributedSignalProcessor implements
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 		final List<SearchCall> queries = new ArrayList<>();
 
+		nodeLogger.log("QuerySignalsSize: " + querySignals.size());
+
 		for (int i = 0; i < threads; i++) {
 			queries.add(new SearchCall(querySignals, signal));
 		}
