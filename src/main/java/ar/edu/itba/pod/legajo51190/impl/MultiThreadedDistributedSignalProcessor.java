@@ -150,8 +150,13 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	@Override
 	public Result findSimilarTo(final Signal signal) throws RemoteException {
+
 		if (signal == null) {
 			throw new IllegalArgumentException("Signal cannot be null");
+		}
+
+		if (node.isNew()) {
+			return new Result(signal);
 		}
 
 		Result result = new Result(signal);
