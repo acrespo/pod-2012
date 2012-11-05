@@ -117,6 +117,8 @@ public class NodeUpdateService {
 								}
 							}
 
+							boolean lastChunk = false;
+
 							List<Address> allMembersButMyself = getAllNodesButMe(
 									node, node.getAliveNodes());
 
@@ -128,7 +130,7 @@ public class NodeUpdateService {
 							isOk = syncMembers(
 									Lists.newArrayList(allMembersButMyself),
 									Lists.newArrayList(node.getAliveNodes()),
-									signalsCopy, copyOfBackupSignals);
+									signalsCopy, copyOfBackupSignals, false);
 
 							if (!isOk) {
 
@@ -246,8 +248,8 @@ public class NodeUpdateService {
 								Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
 										.create();
 
-								prepareChunkOfData(signalsCopy,
-										copyOfBackupSignals, k,
+								boolean lastChunk = prepareChunkOfData(
+										signalsCopy, copyOfBackupSignals, k,
 										signalsCopyToSend,
 										copyOfBackupSignalsToSend);
 
@@ -255,7 +257,7 @@ public class NodeUpdateService {
 										Lists.newArrayList(newMembers),
 										new_view.getMembers(),
 										signalsCopyToSend,
-										copyOfBackupSignalsToSend);
+										copyOfBackupSignalsToSend, lastChunk);
 
 								if (isOK) {
 									removeCopyData(signalsCopy,
@@ -345,10 +347,12 @@ public class NodeUpdateService {
 		}
 	}
 
-	private void prepareChunkOfData(final Set<Signal> signalsCopy,
+	private boolean prepareChunkOfData(final Set<Signal> signalsCopy,
 			final Multimap<Address, Signal> copyOfBackupSignals, int k,
 			final Set<Signal> signalsCopyToSend,
 			final Multimap<Address, Signal> copyOfBackupSignalsToSend) {
+
+		boolean isLast = false;
 		for (Signal s : signalsCopy) {
 			signalsCopyToSend.add(s);
 			k++;
@@ -356,6 +360,9 @@ public class NodeUpdateService {
 				break;
 			}
 		}
+
+		isLast = signalsCopy.size() == signalsCopyToSend.size()
+				|| signalsCopy.size() == CHUNK_SIZE / 2;
 
 		k = 0;
 		for (java.util.Map.Entry<Address, Signal> e : copyOfBackupSignals
@@ -366,11 +373,27 @@ public class NodeUpdateService {
 				break;
 			}
 		}
+
+		isLast = isLast
+				&& copyOfBackupSignals.values().size() == copyOfBackupSignalsToSend
+						.values().size()
+				|| copyOfBackupSignals.values().size() == CHUNK_SIZE / 2;
+
+		if (isLast) {
+			nodeLogger.log("Last log!");
+		} else {
+			nodeLogger.log(copyOfBackupSignals.values().size() + " "
+					+ copyOfBackupSignalsToSend.values().size() + " "
+					+ signalsCopy.size() + " " + signalsCopyToSend.size());
+		}
+
+		return isLast;
 	}
 
 	private boolean syncMembers(final List<Address> newMembers,
 			final List<Address> allMembers, final Set<Signal> signalsCopy,
-			final Multimap<Address, Signal> backupMapCopy) {
+			final Multimap<Address, Signal> backupMapCopy,
+			final boolean lastChunk) {
 
 		Multimap<Address, Signal> signalsToSend = HashMultimap.create();
 
@@ -433,7 +456,8 @@ public class NodeUpdateService {
 		if (node.isOnline()) {
 			// We send the signals to the group members
 			isOK = sendSignalsToMembers(signalsToKeep, signalsToSend,
-					backupSignalsToSend, copyMode, allMembersButMe, allMembers);
+					backupSignalsToSend, copyMode, allMembersButMe, allMembers,
+					lastChunk);
 		}
 
 		if (node.isOnline() && isOK) {
@@ -481,12 +505,14 @@ public class NodeUpdateService {
 
 	/**
 	 * Sends the signals to the members of the group.
+	 * 
+	 * @param lastChunk
 	 */
 	private boolean sendSignalsToMembers(final Set<Signal> signalsToKeep,
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> receptors,
-			final List<Address> allMembers) {
+			final List<Address> allMembers, final boolean lastChunk) {
 
 		// Must be started before any message is sent, we don't want unexpected
 		// countdowns :)
@@ -496,7 +522,7 @@ public class NodeUpdateService {
 
 			for (Address receptor : receptors) {
 				sendSyncMessageToAddress(signalsToSend, backupSignalsToSend,
-						copyMode, allMembers, receptor);
+						copyMode, allMembers, receptor, lastChunk);
 			}
 
 			// If we're on copy mode, we save all the data we sent as backup
@@ -517,13 +543,14 @@ public class NodeUpdateService {
 		}
 
 		return handleTimeouts(signalsToSend, backupSignalsToSend, copyMode,
-				allMembers);
+				allMembers, lastChunk);
 	}
 
 	private boolean handleTimeouts(
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
-			final boolean copyMode, final List<Address> allMembers) {
+			final boolean copyMode, final List<Address> allMembers,
+			final boolean lastChunk) {
 		try {
 			if (!ackLatch.await(5000, TimeUnit.MILLISECONDS)) {
 				throw new Exception("Timeout");
@@ -532,7 +559,8 @@ public class NodeUpdateService {
 			for (Address address : waitingAddresses) {
 				if (node.isOnline()) {
 					sendSyncMessageToAddress(signalsToSend,
-							backupSignalsToSend, copyMode, allMembers, address);
+							backupSignalsToSend, copyMode, allMembers, address,
+							lastChunk);
 				}
 			}
 
@@ -554,12 +582,14 @@ public class NodeUpdateService {
 
 	/**
 	 * Handler to send messages
+	 * 
+	 * @param lastChunk
 	 */
 	private void sendSyncMessageToAddress(
 			final Multimap<Address, Signal> signalsToSend,
 			final Multimap<Address, Signal> backupSignalsToSend,
 			final boolean copyMode, final List<Address> allMembers,
-			final Address address) {
+			final Address address, final boolean lastChunk) {
 
 		if (node.isOnline()) {
 			try {
@@ -583,7 +613,10 @@ public class NodeUpdateService {
 				node.getChannel().send(
 						new Message(address, new GlobalSyncNodeMessage(
 								signalsSending, signalsBackup, copyMode,
-								allMembers)));
+								allMembers, signalsSending.size() == 0
+										|| signalsBackup.size() == 0
+										|| lastChunk)));
+
 			} catch (Exception e1) {
 				if (node.isOnline()) {
 					e1.printStackTrace();
@@ -646,7 +679,7 @@ public class NodeUpdateService {
 					signalsCopyToSend, copyOfBackupSignalsToSend);
 
 			syncMembers(allMembersButMyself, allMembers, signalsCopyToSend,
-					copyOfBackupSignalsToSend);
+					copyOfBackupSignalsToSend, false);
 
 			removeCopyData(signalsCopy, copyOfBackupSignals, signalsCopyToSend,
 					copyOfBackupSignalsToSend);

@@ -64,7 +64,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			MemberWelcomeNodeMessage message = (MemberWelcomeNodeMessage) msg
 					.getObject();
 			handleNewNodeCallback(message.getAllMembers(),
-					message.getDestinations());
+					message.getDestinations(), true);
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessage) {
 			// If the message is a globalsync, we might not have our view info
 			// ready. So we must take that into account.
@@ -141,14 +141,15 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		// After we got all the messages from all our neighbours
 
 		handleNewNodeCallback(message.getAllMembers(),
-				message.getDestinations());
+				message.getDestinations(), message.isLastSyncMessage());
 
 		// nodeLogger.log("We are done!");
 	}
 
 	private synchronized void handleNewNodeCallback(
-			final List<Address> allMembers, final Set<Address> destinations) {
-		if (node.isNew()) {
+			final List<Address> allMembers, final Set<Address> destinations,
+			final boolean isLastSyncMessage) {
+		if (node.isNew() && isLastSyncMessage) {
 			newNodePartsCount.addAndGet(1);
 			nodeLogger.log("New node check");
 			if (newNodePartsCount.get() == allMembers.size()

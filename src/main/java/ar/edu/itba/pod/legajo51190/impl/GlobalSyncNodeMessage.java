@@ -22,15 +22,18 @@ public class GlobalSyncNodeMessage extends NodeMessage {
 	private final Multimap<Address, Signal> backupSignals;
 	private final boolean copyMode;
 	private final List<Address> allMembers;
+	private final boolean isLastSyncMessage;
 
 	public GlobalSyncNodeMessage(final Multimap<Address, Signal> signalsMap,
 			final Multimap<Address, Signal> backupSignals,
-			final boolean copyMode, final List<Address> allMembers) {
+			final boolean copyMode, final List<Address> allMembers,
+			final boolean lastSyncMessage) {
 		super();
 		this.signalsMap = signalsMap;
 		this.backupSignals = backupSignals;
 		this.copyMode = copyMode;
 		this.allMembers = allMembers;
+		isLastSyncMessage = lastSyncMessage;
 	}
 
 	/**
@@ -69,6 +72,10 @@ public class GlobalSyncNodeMessage extends NodeMessage {
 	 */
 	public List<Address> getAllMembers() {
 		return allMembers;
+	}
+
+	public boolean isLastSyncMessage() {
+		return isLastSyncMessage;
 	}
 
 }

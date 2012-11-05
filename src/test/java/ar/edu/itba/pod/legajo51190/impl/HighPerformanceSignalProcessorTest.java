@@ -83,22 +83,13 @@ public class HighPerformanceSignalProcessorTest {
 		final SignalNode first = controller.getNodesToTest().getFirst();
 		final Signal sig = src.next();
 
-		controller.addSignalsToNode(first, 500);
+		controller.addSignalsToNode(first, 1000);
 
 		CountDownLatch newNodeAwaitLatch = new CountDownLatch(1);
 
 		controller.getListener().setNewNodeLatch(newNodeAwaitLatch);
 
-		SignalNode node = controller.getNewSignalNode();
-		try {
-			node.join(controller.getChannelName());
-			controller.getNodesToTest().add(node);
-		} catch (RemoteException e) {
-			e.printStackTrace();
-		}
 		final AtomicBoolean mustQuit = new AtomicBoolean(false);
-
-		final SignalNode lastNode = node;
 
 		Thread t = new Thread(new Runnable() {
 			@Override
@@ -123,6 +114,17 @@ public class HighPerformanceSignalProcessorTest {
 			}
 		});
 
+		t.start();
+
+		SignalNode node = controller.getNewSignalNode();
+		final SignalNode lastNode = node;
+		try {
+			node.join(controller.getChannelName());
+			controller.getNodesToTest().add(node);
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		}
+
 		Thread t2 = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -146,7 +148,6 @@ public class HighPerformanceSignalProcessorTest {
 		});
 
 		t2.start();
-		t.start();
 
 		try {
 			if (!newNodeAwaitLatch.await(120, TimeUnit.SECONDS)) {
