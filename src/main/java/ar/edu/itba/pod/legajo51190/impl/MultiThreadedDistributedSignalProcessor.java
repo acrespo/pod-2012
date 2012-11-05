@@ -167,7 +167,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		nodeLogger.log("Resolved local query!");
 
 		nodeLogger.log("Awaiting remote answers!");
-		result = awaitRemoteAnswers(result, queryId);
+		result = awaitRemoteAnswers(result, queryId, true);
 		nodeLogger.log("Got remote answers!");
 
 		if (result == null) {
@@ -186,22 +186,25 @@ public class MultiThreadedDistributedSignalProcessor implements
 				nodeLogger.log("Resolved local query!");
 
 				nodeLogger.log("Awaiting remote answers!");
-				result = awaitRemoteAnswers(result, queryId);
+				result = awaitRemoteAnswers(result, queryId, false);
 				nodeLogger.log("Got remote answers!");
 
 			} catch (InterruptedException e) {
 				throw new RemoteException(e.getMessage());
 			}
 		}
-		nodeLogger.log(result.toString());
 		return result;
 	}
 
-	private Result awaitRemoteAnswers(Result result, final int queryId) {
+	private Result awaitRemoteAnswers(Result result, final int queryId,
+			final boolean firstAttempt) {
 		try {
 			RemoteQuery query = queries.get(queryId);
 			if (!query.getLatch().await(10000, TimeUnit.MILLISECONDS)) {
-				return null;
+				if (firstAttempt) {
+					return null;
+				}
+				nodeLogger.log("Awaited timeout!");
 			}
 
 			for (Result res : query.getResults()) {
