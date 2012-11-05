@@ -155,10 +155,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 			throw new IllegalArgumentException("Signal cannot be null");
 		}
 
-		if (node.isNew()) {
-			return new Result(signal);
-		}
-
 		Result result = new Result(signal);
 
 		awaitQueryCount.incrementAndGet();
@@ -287,6 +283,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 	}
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
+
+		if (node.isNew()) {
+			return new Result(signal);
+		}
+
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 		final List<SearchCall> queries = new ArrayList<>();
 
