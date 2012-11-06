@@ -63,6 +63,8 @@ public class Node implements JGroupNode {
 		setIsNew(true);
 		online.set(false);
 		newNodeSemaphore.drainPermits();
+		setNodeView(null);
+		setNodeAddress(null);
 		channel = new JChannel("udp-largecluster.xml");
 	}
 
@@ -178,6 +180,7 @@ public class Node implements JGroupNode {
 		getTemporalSignals().clear();
 		getChannel().disconnect();
 		getChannel().close();
+
 	}
 
 	@Override
