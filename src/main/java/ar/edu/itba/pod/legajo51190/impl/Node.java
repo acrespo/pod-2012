@@ -2,6 +2,7 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,8 +29,8 @@ import com.google.common.collect.Multimaps;
 
 public class Node implements JGroupNode {
 	private final Multimap<Address, Signal> backupSignals;
-	private Set<Address> aliveNodes;
-	private Set<String> aliveNodeNames;
+	private Set<Address> aliveNodes = new HashSet<>();
+	private Set<String> aliveNodeNames = new HashSet<>();
 	private View lastView;
 	private Address nodeAddress;
 	private final AtomicBoolean isDegraded = new AtomicBoolean(false);

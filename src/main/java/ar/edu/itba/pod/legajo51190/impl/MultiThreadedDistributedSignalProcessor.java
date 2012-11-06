@@ -116,7 +116,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		Set<Address> allButMe = new HashSet<>(node.getAliveNodes());
 		allButMe.remove(node.getAddress());
-		System.out.println(node.getAddress() + ": Asking to " + allButMe);
 
 		queries.put(queryId, new RemoteQuery(allButMe));
 		Message msg = new Message(null, new QueryNodeMessage(signal, queryId,
@@ -319,7 +318,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	@Override
 	public void onNodeGoneFixed() {
-		System.out.println("GONE NODE FIXED!");
 		sem.release(awaitQueryCount.getAndSet(0));
 	}
 

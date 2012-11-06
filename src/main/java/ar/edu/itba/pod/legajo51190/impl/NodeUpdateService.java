@@ -129,8 +129,6 @@ public class NodeUpdateService {
 									signalsCopy, copyOfBackupSignals, false);
 
 							if (!isOk) {
-
-								System.out.println("node fallen on sync!");
 								List<Address> allMinusWaiting = new ArrayList<>(
 										node.getAliveNodes());
 								allMinusWaiting.removeAll(waitingAddresses);
@@ -297,8 +295,6 @@ public class NodeUpdateService {
 										+ newMembers.toString());
 								node.getListener().onNodeSyncDone();
 							}
-							System.out.println(node.getAddress()
-									+ ": Done with new view!");
 
 							node.getRedistributionSignals().clear();
 
@@ -698,7 +694,6 @@ public class NodeUpdateService {
 			node.getListener().onNodeGoneSyncDone();
 		}
 
-		System.out.println("Gone members!" + goneMembers);
 		node.getSignalProcessor().onNodeGoneFixed();
 
 	}
