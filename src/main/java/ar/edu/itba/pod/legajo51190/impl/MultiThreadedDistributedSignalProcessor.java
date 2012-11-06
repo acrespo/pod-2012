@@ -286,7 +286,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private Result resolveLocalQueries(final Signal signal, Result result) {
 
-		if (node.isNew()) {
+		if (node.isOnline() && node.isNew()) {
 			return new Result(signal);
 		}
 
