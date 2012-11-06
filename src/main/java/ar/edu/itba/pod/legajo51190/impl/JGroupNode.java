@@ -53,4 +53,6 @@ public interface JGroupNode {
 	JGroupSignalProcessor getSignalProcessor();
 
 	Set<Signal> getTemporalSignals();
+
+	void reset() throws Exception;
 }

@@ -39,7 +39,7 @@ public class Node implements JGroupNode {
 	private final BlockingQueue<Signal> toDistributeSignals = new LinkedBlockingQueue<>();
 	private final Set<Signal> redistributionSignals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
-	private final Channel channel;
+	private Channel channel;
 	private final NodeListener listener;
 	private final AtomicBoolean online = new AtomicBoolean(false);
 	private final JGroupSignalProcessor signalProcessor;
@@ -56,6 +56,11 @@ public class Node implements JGroupNode {
 		this.listener = listener;
 		Multimap<Address, Signal> sig = HashMultimap.create();
 		backupSignals = Multimaps.synchronizedMultimap(sig);
+	}
+
+	@Override
+	public void reset() throws Exception {
+		channel = new JChannel("udp-largecluster.xml");
 	}
 
 	@Override

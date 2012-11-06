@@ -247,7 +247,12 @@ public class MultiThreadedDistributedSignalProcessor implements
 		try {
 			node.joinChannel(clusterName);
 		} catch (Exception e) {
-			throw new RemoteException(e.getMessage());
+			try {
+				node.reset();
+				node.joinChannel(clusterName);
+			} catch (Exception e2) {
+				throw new RemoteException(e.getMessage());
+			}
 		}
 	}
 
