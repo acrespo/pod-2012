@@ -3,8 +3,10 @@ package ar.edu.itba.pod.legajo51190.impl;
 import java.rmi.RemoteException;
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -33,8 +35,7 @@ public class Node implements JGroupNode {
 	private final AtomicBoolean isDegraded = new AtomicBoolean(false);
 	private final Set<Signal> signals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
-	private final Set<Signal> toDistributeSignals = Collections
-			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+	private final BlockingQueue<Signal> toDistributeSignals = new LinkedBlockingQueue<>();
 	private final Set<Signal> redistributionSignals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final Channel channel;
@@ -90,7 +91,7 @@ public class Node implements JGroupNode {
 	}
 
 	@Override
-	public Set<Signal> getToDistributeSignals() {
+	public BlockingQueue<Signal> getToDistributeSignals() {
 		return toDistributeSignals;
 	}
 

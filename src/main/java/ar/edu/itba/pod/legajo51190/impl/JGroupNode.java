@@ -2,6 +2,7 @@ package ar.edu.itba.pod.legajo51190.impl;
 
 import java.rmi.RemoteException;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jgroups.Address;
@@ -35,7 +36,7 @@ public interface JGroupNode {
 
 	public Set<Signal> getRedistributionSignals();
 
-	public Set<Signal> getToDistributeSignals();
+	public BlockingQueue<Signal> getToDistributeSignals();
 
 	public Multimap<Address, Signal> getBackupSignals();
 

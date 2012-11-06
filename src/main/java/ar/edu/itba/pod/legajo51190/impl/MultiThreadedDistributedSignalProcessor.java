@@ -104,8 +104,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	@Override
 	public void add(final Signal signal) throws RemoteException {
-		synchronized (node.getToDistributeSignals()) {
-			node.getToDistributeSignals().add(signal);
+		try {
+			node.getToDistributeSignals().put(signal);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -242,9 +244,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 	@Override
 	public void onQueryReception(final QueryNodeMessage query,
 			final Address from) {
-		// if (!query.getReceiptMembers().contains(node.getAddress())) {
-		// return;
-		// }
 
 		requestProcessingService.submit(new Runnable() {
 			@Override

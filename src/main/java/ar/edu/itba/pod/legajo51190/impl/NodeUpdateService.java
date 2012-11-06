@@ -5,8 +5,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -61,7 +59,7 @@ public class NodeUpdateService {
 	 * Timer that polls the "to distribute signals" for new elements in order to
 	 * send them.
 	 */
-	private final Timer dataUpdateTimer;
+	private final Thread dataUpdateThread;
 	/**
 	 * The timer can only be activated then no new node is synchronizing so it
 	 * can be controlled with this.
@@ -88,42 +86,39 @@ public class NodeUpdateService {
 
 		nodeLogger = new NodeLogger(node);
 
-		dataUpdateTimer = new Timer();
-		dataUpdateTimer.scheduleAtFixedRate(new TimerTask() {
+		dataUpdateThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
-				try {
 
-					// If there is connection and the timer can work.
-					if (timerEnabled.get() && node.getChannel() != null
-							&& node.getChannel().isConnected()) {
+				final Set<Signal> signalsCopy = new HashSet<>();
+				Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
+						.create();
+				while (!Thread.interrupted()) {
+					try {
 
-						if (node.getToDistributeSignals().size() > 0) {
-
-							// nodeLogger.log("Sending nodes..."
-							// + node.getToDistributeSignals().size());
-
-							// The copy of the signals to send must be isolated
-							final Set<Signal> signalsCopy = new HashSet<>();
-							synchronized (node.getToDistributeSignals()) {
-								int k = 0;
-								for (Signal signal : node
-										.getToDistributeSignals()) {
-									signalsCopy.add(signal);
-									k++;
-									if (k == CHUNK_SIZE) {
-										break;
-									}
+						for (int k = 0; k < CHUNK_SIZE; k++) {
+							Signal sig = node.getToDistributeSignals().poll(
+									1000, TimeUnit.MILLISECONDS);
+							if (sig == null || signalsCopy.size() == CHUNK_SIZE) {
+								if (sig != null) {
+									node.getToDistributeSignals().add(sig);
 								}
+								break;
+							} else {
+								signalsCopy.add(sig);
 							}
+						}
 
-							boolean lastChunk = false;
+						// If there is connection and the timer can work.
+						if (timerEnabled.get() && node.getChannel() != null
+								&& node.getChannel().isConnected()
+								&& signalsCopy.size() > 0) {
+
+							nodeLogger.log("SignalsCopySize: "
+									+ signalsCopy.size());
 
 							List<Address> allMembersButMyself = getAllNodesButMe(
 									node, node.getAliveNodes());
-
-							Multimap<Address, Signal> copyOfBackupSignals = HashMultimap
-									.create();
 
 							boolean isOk = true;
 
@@ -143,10 +138,8 @@ public class NodeUpdateService {
 										allMinusWaiting);
 							}
 
-							synchronized (node.getToDistributeSignals()) {
-								node.getToDistributeSignals().removeAll(
-										signalsCopy);
-							}
+							node.getToDistributeSignals()
+									.removeAll(signalsCopy);
 
 							if (node.getToDistributeSignals().isEmpty()
 									&& node.getListener() != null) {
@@ -156,16 +149,20 @@ public class NodeUpdateService {
 								node.getListener().onNodeSyncDone();
 							}
 
-							// nodeLogger.log("Sent nodes!!!");
-						}
+							signalsCopy.clear();
 
+							// nodeLogger.log("Sent nodes!!!");
+
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-				} catch (Exception e) {
-					e.printStackTrace();
 				}
 			}
 
-		}, 0, 1000);
+		});
+
+		dataUpdateThread.start();
 
 	}
 
