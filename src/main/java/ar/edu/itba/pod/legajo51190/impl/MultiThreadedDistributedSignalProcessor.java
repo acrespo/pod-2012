@@ -137,18 +137,16 @@ public class MultiThreadedDistributedSignalProcessor implements
 	private BlockingQueue<Signal> buildQuerySignalSet() {
 
 		Set<Signal> sigs = new HashSet<>();
-		synchronized (node.getToDistributeSignals()) {
-			synchronized (node.getLocalSignals()) {
-				synchronized (node.getRedistributionSignals()) {
-					synchronized (node.getTemporalSignals()) {
-						sigs.addAll(node.getTemporalSignals());
-						sigs.addAll(node.getToDistributeSignals());
-						sigs.addAll(node.getRedistributionSignals());
-						sigs.addAll(node.getLocalSignals());
-					}
+		synchronized (node.getLocalSignals()) {
+			synchronized (node.getRedistributionSignals()) {
+				synchronized (node.getTemporalSignals()) {
+					sigs.addAll(node.getTemporalSignals());
+					sigs.addAll(node.getRedistributionSignals());
+					sigs.addAll(node.getLocalSignals());
 				}
 			}
 		}
+
 		return new LinkedBlockingQueue<>(sigs);
 	}
 
