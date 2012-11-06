@@ -114,6 +114,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private void askRemoteQueries(final Signal signal, final int queryId) {
 
+		if (!node.isOnline()) {
+			return;
+		}
+
 		Set<Address> allButMe = new HashSet<>(node.getAliveNodes());
 		allButMe.remove(node.getAddress());
 
@@ -204,6 +208,11 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	private Result awaitRemoteAnswers(Result result, final int queryId,
 			final boolean firstAttempt) {
+
+		if (!node.isOnline()) {
+			return result;
+		}
+
 		try {
 			RemoteQuery query = queries.get(queryId);
 			if (!query.getLatch().await(10000, TimeUnit.MILLISECONDS)) {
