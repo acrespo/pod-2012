@@ -77,6 +77,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		} else if (msg.getObject() instanceof SyncDoneNodeMessage) {
 			onNotifyGoneMessageReceived();
 		} else if (msg.getObject() instanceof QueryNodeMessage) {
+			node.getQueryCount().incrementAndGet();
 			node.getSignalProcessor().onQueryReception(
 					(QueryNodeMessage) msg.getObject(), msg.getSrc());
 		} else if (msg.getObject() instanceof QueryResultNodeMessage) {

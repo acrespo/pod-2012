@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
 
@@ -47,6 +48,7 @@ public class Node implements JGroupNode {
 	private final Semaphore newNodeSemaphore = new Semaphore(0);
 	private final Set<Signal> temporalSignals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
+	private final AtomicInteger queryCount = new AtomicInteger(0);
 
 	public Node(final NodeListener listener,
 			final JGroupSignalProcessor signalProcessor) throws Exception {
@@ -141,8 +143,8 @@ public class Node implements JGroupNode {
 
 	@Override
 	public NodeStats getStats() {
-		// TODO: Improve nodestats implementation
-		return new NodeStats(getAddress().toString(), 0, signals.size()
+		return new NodeStats(getAddress() != null ? getAddress().toString()
+				: "Sin canal", queryCount.get(), signals.size()
 				+ toDistributeSignals.size(), backupSignals.size(), false);
 	}
 
@@ -179,7 +181,6 @@ public class Node implements JGroupNode {
 		getRedistributionSignals().clear();
 		getTemporalSignals().clear();
 		getChannel().disconnect();
-
 	}
 
 	@Override
@@ -197,6 +198,10 @@ public class Node implements JGroupNode {
 
 	public Semaphore getNewSemaphore() {
 		return newNodeSemaphore;
+	}
+
+	public AtomicInteger getQueryCount() {
+		return queryCount;
 	}
 
 }
