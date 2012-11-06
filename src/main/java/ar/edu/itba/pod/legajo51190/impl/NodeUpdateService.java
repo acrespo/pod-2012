@@ -64,9 +64,11 @@ public class NodeUpdateService {
 	 * The timer can only be activated then no new node is synchronizing so it
 	 * can be controlled with this.
 	 */
-	private final AtomicBoolean timerEnabled = new AtomicBoolean(true);
+	private final AtomicBoolean updateOfNewNodesEnabled = new AtomicBoolean(
+			true);
 	private final NodeLogger nodeLogger;
 
+	@SuppressWarnings("unused")
 	private final JGroupSignalProcessor processor;
 
 	public NodeUpdateService(final Node node,
@@ -78,14 +80,17 @@ public class NodeUpdateService {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
 				if (nodeSyncService.getActiveCount() == 0) {
-					node.setDegraded(getQueue().isEmpty());
-					timerEnabled.set(getQueue().isEmpty());
+					updateOfNewNodesEnabled.set(getQueue().isEmpty());
 				}
 			}
 		};
 
 		nodeLogger = new NodeLogger(node);
 
+		/**
+		 * Thread that awaits for new data to be added to this node and sends
+		 * the new backups to other members
+		 */
 		dataUpdateThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -96,64 +101,83 @@ public class NodeUpdateService {
 				while (!Thread.interrupted()) {
 					try {
 
-						for (int k = 0; k < CHUNK_SIZE; k++) {
-							Signal sig = node.getToDistributeSignals().poll(
-									1000, TimeUnit.MILLISECONDS);
+						/**
+						 * First we take out of the queue the nodes we need to
+						 * send
+						 */
+						acumulateCopiesToBeSent(node, signalsCopy);
 
-							if (sig == null || signalsCopy.size() == CHUNK_SIZE) {
-								if (sig != null) {
-									node.getToDistributeSignals().add(sig);
-								}
-								break;
-							} else {
-								signalsCopy.add(sig);
-							}
-						}
-
-						// If there is connection and the timer can work.
-						if (timerEnabled.get() && node.getChannel() != null
+						/**
+						 * We only send messages if there aren't other tasks
+						 * sending messages, if we are connected, and if we have
+						 * something to send
+						 */
+						if (updateOfNewNodesEnabled.get()
+								&& node.getChannel() != null
 								&& node.getChannel().isConnected()
 								&& signalsCopy.size() > 0) {
-
-							nodeLogger.log("SignalsCopySize: "
-									+ signalsCopy.size());
-
-							List<Address> allMembersButMyself = getAllNodesButMe(
-									node, node.getAliveNodes());
-
-							boolean isOk = true;
-
-							isOk = syncMembers(
-									Lists.newArrayList(allMembersButMyself),
-									Lists.newArrayList(node.getAliveNodes()),
-									signalsCopy, copyOfBackupSignals, false);
-
-							if (!isOk) {
-								List<Address> allMinusWaiting = new ArrayList<>(
-										node.getAliveNodes());
-								allMinusWaiting.removeAll(waitingAddresses);
-
-								resolveGoneMembers(waitingAddresses,
-										allMinusWaiting);
-							}
-
-							node.getTemporalSignals().removeAll(signalsCopy);
-
-							if (node.getToDistributeSignals().isEmpty()
-									&& node.getListener() != null) {
-								synchronized (node.getToDistributeSignals()) {
-									node.getToDistributeSignals().notifyAll();
-								}
-								node.getListener().onNodeSyncDone();
-							}
-
-							signalsCopy.clear();
-
-							// nodeLogger.log("Sent nodes!!!");
+							/**
+							 * Now we can send the copies to the other nodes
+							 */
+							sendCopies(node, signalsCopy, copyOfBackupSignals);
 
 						}
 					} catch (Exception e) {
 						e.printStackTrace();
+					}
+				}
+			}
+
+			private void sendCopies(final Node node,
+					final Set<Signal> signalsCopy,
+					final Multimap<Address, Signal> copyOfBackupSignals) {
+				List<Address> allMembersButMyself = getAllNodesButMe(node,
+						node.getAliveNodes());
+
+				/**
+				 * We send the data to all the members but ourselves, and we
+				 * keep the backups
+				 */
+				boolean isOk = syncMembers(
+						Lists.newArrayList(allMembersButMyself),
+						Lists.newArrayList(node.getAliveNodes()), signalsCopy,
+						copyOfBackupSignals, false);
+
+				// If there's a problem then we go back and reuse
+				// everything.
+				if (!isOk) {
+					List<Address> allMinusWaiting = new ArrayList<>(node
+							.getAliveNodes());
+					allMinusWaiting.removeAll(waitingAddresses);
+					resolveGoneMembers(waitingAddresses, allMinusWaiting);
+				}
+
+				node.getTemporalSignals().removeAll(signalsCopy);
+
+				if (node.getToDistributeSignals().isEmpty()
+						&& node.getListener() != null) {
+					synchronized (node.getToDistributeSignals()) {
+						node.getToDistributeSignals().notifyAll();
+					}
+					node.getListener().onNodeSyncDone();
+				}
+
+				signalsCopy.clear();
+			}
+
+			private void acumulateCopiesToBeSent(final Node node,
+					final Set<Signal> signalsCopy) throws InterruptedException {
+				for (int k = 0; k < CHUNK_SIZE; k++) {
+					Signal sig = node.getToDistributeSignals().poll(1000,
+							TimeUnit.MILLISECONDS);
+
+					if (sig == null || signalsCopy.size() == CHUNK_SIZE) {
+						if (sig != null) {
+							node.getToDistributeSignals().add(sig);
+						}
+						break;
+					} else {
+						signalsCopy.add(sig);
 					}
 				}
 			}
@@ -184,8 +208,10 @@ public class NodeUpdateService {
 
 					if (node.getLastView() != null) {
 
-						// If we are distributing signals we have to wait
-						// For the distribution to be done
+						/**
+						 * If we are distributing signals we have to wait for
+						 * the distribution to be done
+						 */
 						synchronized (node.getToDistributeSignals()) {
 							while (node.getToDistributeSignals().size() > 0) {
 								node.getToDistributeSignals().wait(1000);
@@ -195,134 +221,148 @@ public class NodeUpdateService {
 						Set<Address> newMembers = detectNewMembers(new_view);
 						Set<Address> goneMembers = detectGoneMembers(new_view);
 
+						/**
+						 * If a node is gone we fix cluster
+						 */
 						if (goneMembers.size() > 0) {
 							resolveGoneMembers(goneMembers,
 									new_view.getMembers());
 						}
 
-						nodeLogger.log("Awaiting for my join to the group...");
+						/**
+						 * If we're new we must wait to be able to sync nodes,
+						 * we might still be receiving data.
+						 */
 						node.getNewSemaphore().acquire();
-						nodeLogger.log("GOT IT!...");
+
+						/**
+						 * If there's something to sync then we do the
+						 * synchronization
+						 */
 						if (newMembers.size() > 0
 								&& node.getLocalSignals().size() > 0) {
-
-							final Set<Signal> signalsCopy = new HashSet<>();
-							synchronized (node.getLocalSignals()) {
-								synchronized (node.getRedistributionSignals()) {
-									node.getRedistributionSignals().addAll(
-											node.getLocalSignals());
-									signalsCopy.addAll(node.getLocalSignals());
-								}
-							}
-
-							Multimap<Address, Signal> copyOfBackupSignals = null;
-
-							synchronized (node.getBackupSignals()) {
-								copyOfBackupSignals = HashMultimap.create(node
-										.getBackupSignals());
-							}
-
-							newMemberLatch = new CountDownLatch(1);
-
-							List<Address> allSyncMembers = getAllNodesButMe(
-									node, new_view.getMembers());
-
-							allSyncMembers.removeAll(newMembers);
-							allSyncMembers.removeAll(goneMembers);
-
-							memberSyncLatch = new CountDownLatch(allSyncMembers
-									.size());
-
-							node.setNodeView(new_view);
-
-							boolean isOK = true;
-							do {
-								int k = 0;
-
-								Set<Signal> signalsCopyToSend = new HashSet<>();
-								Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
-										.create();
-
-								boolean lastChunk = prepareChunkOfData(
-										signalsCopy, copyOfBackupSignals, k,
-										signalsCopyToSend,
-										copyOfBackupSignalsToSend);
-
-								isOK = syncMembers(
-										Lists.newArrayList(newMembers),
-										new_view.getMembers(),
-										signalsCopyToSend,
-										copyOfBackupSignalsToSend, lastChunk);
-
-								if (isOK) {
-									removeCopyData(signalsCopy,
-											copyOfBackupSignals,
-											signalsCopyToSend,
-											copyOfBackupSignalsToSend);
-								} else {
-									break;
-								}
-							} while (copyOfBackupSignals.size() > 0
-									|| signalsCopy.size() > 0);
-
-							if (isOK) {
-
-								nodeLogger.log("Awaiting ...");
-								if (!newMemberLatch.await(10000,
-										TimeUnit.MILLISECONDS)) {
-									nodeLogger.log("TIMEOUTED!!!");
-								}
-
-								if (node.isOnline()) {
-									tellOtherNodesImDoneRedistributingData();
-								}
-
-								if (!memberSyncLatch.await(10000,
-										TimeUnit.MILLISECONDS)) {
-									nodeLogger.log("TIMEOUTED!!! 2");
-								}
-							} else {
-								List<Address> allMinusWaiting = new ArrayList<>(
-										new_view.getMembers());
-								allMinusWaiting.removeAll(waitingAddresses);
-
-								resolveGoneMembers(waitingAddresses,
-										allMinusWaiting);
-							}
-
-							if (node.getListener() != null) {
-								nodeLogger.log("New node sync call for "
-										+ newMembers.toString());
-								node.getListener().onNodeSyncDone();
-							}
-
-							node.getRedistributionSignals().clear();
+							/**
+							 * Synchronize the members of the node and await for
+							 * everyone to be ready
+							 */
+							doSyncWithNewMembers(new_view, newMembers,
+									goneMembers);
 
 						} else if (newMembers.size() > 0) {
-							for (Address address : newMembers) {
-								Message msg = new Message(address,
-										new MemberWelcomeNodeMessage(
-												newMembers, new_view
-														.getMembers()));
-								node.getChannel().send(msg);
-							}
-							nodeLogger.log("Told new nodes to join: "
-									+ newMembers);
-
-							if (node.getListener() != null) {
-								nodeLogger.log("New node sync call for "
-										+ newMembers.toString());
-								node.getListener().onNodeSyncDone();
-							}
+							/**
+							 * Tell the new members they are welcome and await
+							 * everyone to be ready
+							 */
+							tellNewNodesToJoin(new_view, newMembers);
 						}
 
 						node.getNewSemaphore().release();
 					}
 
 					node.setNodeView(new_view);
-
 				} catch (Exception e) {
 					e.printStackTrace();
+				}
+			}
+
+			private void doSyncWithNewMembers(final View new_view,
+					final Set<Address> newMembers,
+					final Set<Address> goneMembers) throws InterruptedException {
+				final Set<Signal> signalsCopy = new HashSet<>();
+				synchronized (node.getLocalSignals()) {
+					synchronized (node.getRedistributionSignals()) {
+						node.getRedistributionSignals().addAll(
+								node.getLocalSignals());
+						signalsCopy.addAll(node.getLocalSignals());
+					}
+				}
+
+				Multimap<Address, Signal> copyOfBackupSignals = null;
+
+				synchronized (node.getBackupSignals()) {
+					copyOfBackupSignals = HashMultimap.create(node
+							.getBackupSignals());
+				}
+
+				newMemberLatch = new CountDownLatch(1);
+
+				List<Address> allSyncMembers = getAllNodesButMe(node,
+						new_view.getMembers());
+
+				allSyncMembers.removeAll(newMembers);
+				allSyncMembers.removeAll(goneMembers);
+
+				memberSyncLatch = new CountDownLatch(allSyncMembers.size());
+
+				node.setNodeView(new_view);
+
+				boolean isOK = true;
+				do {
+					int k = 0;
+
+					Set<Signal> signalsCopyToSend = new HashSet<>();
+					Multimap<Address, Signal> copyOfBackupSignalsToSend = HashMultimap
+							.create();
+
+					boolean lastChunk = prepareChunkOfData(signalsCopy,
+							copyOfBackupSignals, k, signalsCopyToSend,
+							copyOfBackupSignalsToSend);
+
+					isOK = syncMembers(Lists.newArrayList(newMembers),
+							new_view.getMembers(), signalsCopyToSend,
+							copyOfBackupSignalsToSend, lastChunk);
+
+					if (isOK) {
+						removeCopyData(signalsCopy, copyOfBackupSignals,
+								signalsCopyToSend, copyOfBackupSignalsToSend);
+					} else {
+						break;
+					}
+				} while (copyOfBackupSignals.size() > 0
+						|| signalsCopy.size() > 0);
+
+				if (isOK) {
+
+					nodeLogger.log("Awaiting ...");
+					if (!newMemberLatch.await(10000, TimeUnit.MILLISECONDS)) {
+						nodeLogger.log("TIMEOUTED!!!");
+					}
+
+					if (node.isOnline()) {
+						tellOtherNodesImDoneRedistributingData();
+					}
+
+					if (!memberSyncLatch.await(10000, TimeUnit.MILLISECONDS)) {
+						nodeLogger.log("TIMEOUTED!!! 2");
+					}
+				} else {
+					List<Address> allMinusWaiting = new ArrayList<>(new_view
+							.getMembers());
+					allMinusWaiting.removeAll(waitingAddresses);
+
+					resolveGoneMembers(waitingAddresses, allMinusWaiting);
+				}
+
+				if (node.getListener() != null) {
+					nodeLogger.log("New node sync call for "
+							+ newMembers.toString());
+					node.getListener().onNodeSyncDone();
+				}
+
+				node.getRedistributionSignals().clear();
+			}
+
+			private void tellNewNodesToJoin(final View new_view,
+					final Set<Address> newMembers) throws Exception {
+				for (Address address : newMembers) {
+					Message msg = new Message(address,
+							new MemberWelcomeNodeMessage(newMembers, new_view
+									.getMembers()));
+					node.getChannel().send(msg);
+				}
+
+				if (node.getListener() != null) {
+					node.getListener().onNodeSyncDone();
 				}
 			}
 
@@ -643,12 +683,14 @@ public class NodeUpdateService {
 								node.getLocalSignals());
 						node.getRedistributionSignals().addAll(
 								node.getToDistributeSignals());
+						node.getRedistributionSignals().addAll(
+								node.getTemporalSignals());
 						node.getBackupSignals().clear();
 						node.getLocalSignals().clear();
 						node.getToDistributeSignals().clear();
 						signalsCopy = new HashSet<>(
 								node.getRedistributionSignals());
-						timerEnabled.set(false);
+						updateOfNewNodesEnabled.set(false);
 					}
 				}
 			}
@@ -696,6 +738,7 @@ public class NodeUpdateService {
 
 		node.getSignalProcessor().onNodeGoneFixed();
 
+		updateOfNewNodesEnabled.set(true);
 	}
 
 	private void tellOtherNodesImDoneRedistributingData() {
@@ -714,7 +757,6 @@ public class NodeUpdateService {
 		for (Address address : node.getLastView().getMembers()) {
 			if (!new_view.containsMember(address)) {
 				nodeLogger.log("Gone member! bye! " + address);
-				node.setDegraded(true);
 				goneMembers.add(address);
 			}
 		}
@@ -725,8 +767,6 @@ public class NodeUpdateService {
 		Set<Address> newMembers = new HashSet<Address>();
 		for (Address address : new_view.getMembers()) {
 			if (!node.getLastView().containsMember(address)) {
-				// nodeLogger.log("New member! hey! " + address);
-				node.setDegraded(true);
 				newMembers.add(address);
 			}
 		}

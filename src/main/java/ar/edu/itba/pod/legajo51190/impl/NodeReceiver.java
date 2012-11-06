@@ -87,14 +87,21 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 			onNotifyNewNodeReady();
 		} else if (msg.getObject() instanceof SyncDoneNodeMessage) {
 			/**
-			 * 
+			 * Reception of the notification of other nodes done syncing a new
+			 * or gone node.
 			 */
 			onNotifySyncMessageReceived();
 		} else if (msg.getObject() instanceof QueryNodeMessage) {
+			/**
+			 * Reception of a query (findSimilarTo)
+			 */
 			node.getQueryCount().incrementAndGet();
 			node.getSignalProcessor().onQueryReception(
 					(QueryNodeMessage) msg.getObject(), msg.getSrc());
 		} else if (msg.getObject() instanceof QueryResultNodeMessage) {
+			/**
+			 * Reception of a result processed by another node in the cluster
+			 */
 			node.getSignalProcessor().onResultReception(
 					(QueryResultNodeMessage) msg.getObject(), msg.getSrc());
 		}

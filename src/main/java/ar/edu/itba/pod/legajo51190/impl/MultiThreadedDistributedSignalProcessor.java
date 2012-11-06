@@ -37,6 +37,11 @@ import ar.edu.itba.pod.api.SignalProcessor;
 public class MultiThreadedDistributedSignalProcessor implements
 		JGroupSignalProcessor, SignalProcessor, SPNode {
 
+	/**
+	 * Represents the information of a query to be sent to other nodes
+	 * 
+	 * @author cris
+	 */
 	private static class RemoteQuery {
 		private final CountDownLatch latch;
 		private final Set<Address> remoteNodes;
@@ -59,7 +64,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 		}
 	}
 
-	private final Semaphore sem = new Semaphore(0);
+	private final Semaphore recoverySemaphore = new Semaphore(0);
 	private final ExecutorService localProcessingService;
 	private final ExecutorService requestProcessingService;
 	private final int threads;
@@ -168,34 +173,22 @@ public class MultiThreadedDistributedSignalProcessor implements
 		int queryId = queryIdGenerator.getAndIncrement();
 
 		askRemoteQueries(signal, queryId);
-		nodeLogger.log("Asking remotes for the query!");
 
-		nodeLogger.log("Resolving local query!");
 		result = resolveLocalQueries(signal, result);
-		nodeLogger.log("Resolved local query!");
 
-		nodeLogger.log("Awaiting remote answers!");
 		result = awaitRemoteAnswers(result, queryId, true);
-		nodeLogger.log("Got remote answers!");
 
 		if (result == null) {
 			try {
-				nodeLogger.log("Waiting for node recovery!");
-				sem.tryAcquire(30000, TimeUnit.MILLISECONDS);
-				nodeLogger.log("Node recovery done!");
+				recoverySemaphore.tryAcquire(30000, TimeUnit.MILLISECONDS);
 
 				result = new Result(signal);
 
 				askRemoteQueries(signal, queryId);
-				nodeLogger.log("Asking remotes for the query!");
 
-				nodeLogger.log("Resolving local query!");
 				result = resolveLocalQueries(signal, result);
-				nodeLogger.log("Resolved local query!");
 
-				nodeLogger.log("Awaiting remote answers!");
 				result = awaitRemoteAnswers(result, queryId, false);
-				nodeLogger.log("Got remote answers!");
 
 			} catch (InterruptedException e) {
 				throw new RemoteException(e.getMessage());
@@ -300,14 +293,10 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		if (node.isOnline() && node.isNew()) {
 			return new Result(signal);
-		} else {
-			nodeLogger.log("Im local!");
 		}
 
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
 		final List<SearchCall> queries = new ArrayList<>();
-
-		nodeLogger.log("QuerySignalsSize: " + querySignals.size());
 
 		for (int i = 0; i < threads; i++) {
 			queries.add(new SearchCall(querySignals, signal));
@@ -332,11 +321,6 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 	@Override
 	public void onNodeGoneFixed() {
-		sem.release(awaitQueryCount.getAndSet(0));
-	}
-
-	@Override
-	public boolean isWorking() {
-		return processingCount.get() == 0;
+		recoverySemaphore.release(awaitQueryCount.getAndSet(0));
 	}
 }

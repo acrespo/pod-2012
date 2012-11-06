@@ -3,7 +3,6 @@ package ar.edu.itba.pod.legajo51190.impl;
 import java.rmi.RemoteException;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jgroups.Address;
 import org.jgroups.Channel;
@@ -25,8 +24,6 @@ public interface JGroupNode {
 	public Set<String> getAliveNodeNames();
 
 	public Set<Address> getAliveNodes();
-
-	public AtomicBoolean getIsDegraded();
 
 	public View getLastView();
 

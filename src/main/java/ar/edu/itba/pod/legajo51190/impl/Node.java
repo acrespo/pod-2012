@@ -34,7 +34,6 @@ public class Node implements JGroupNode {
 	private Set<String> aliveNodeNames = new HashSet<>();
 	private View lastView;
 	private Address nodeAddress;
-	private final AtomicBoolean isDegraded = new AtomicBoolean(false);
 	private final Set<Signal> signals = Collections
 			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 	private final BlockingQueue<Signal> toDistributeSignals = new LinkedBlockingQueue<>();
@@ -91,11 +90,6 @@ public class Node implements JGroupNode {
 	}
 
 	@Override
-	public AtomicBoolean getIsDegraded() {
-		return isDegraded;
-	}
-
-	@Override
 	public View getLastView() {
 		return lastView;
 	}
@@ -113,10 +107,6 @@ public class Node implements JGroupNode {
 	@Override
 	public Set<Signal> getTemporalSignals() {
 		return temporalSignals;
-	}
-
-	public void setDegraded(final boolean b) {
-		isDegraded.set(b);
 	}
 
 	public void setNodeAddress(final Address address) {
