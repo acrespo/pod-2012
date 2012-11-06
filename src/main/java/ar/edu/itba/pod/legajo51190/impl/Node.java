@@ -60,6 +60,9 @@ public class Node implements JGroupNode {
 
 	@Override
 	public void reset() throws Exception {
+		setIsNew(true);
+		online.set(false);
+		newNodeSemaphore.drainPermits();
 		channel = new JChannel("udp-largecluster.xml");
 	}
 
