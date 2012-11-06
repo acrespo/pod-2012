@@ -55,6 +55,7 @@ public class NodeTestController {
 			try {
 				isBlocking = node.getInjectedListener() == null;
 				node.exit();
+				node.getJGroupNode().getChannel().close();
 			} catch (RemoteException e) {
 
 			}

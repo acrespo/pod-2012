@@ -10,7 +10,7 @@ import java.io.PrintStream;
 public class NodeLogger {
 	private final JGroupNode node;
 	private final PrintStream stream;
-	private boolean enabled = true;
+	private boolean enabled = false;
 	private StringBuilder builder = new StringBuilder();
 
 	public NodeLogger(final JGroupNode node) {

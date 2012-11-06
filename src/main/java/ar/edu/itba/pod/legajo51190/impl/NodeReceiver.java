@@ -61,21 +61,35 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	@Override
 	public void receive(final Message msg) {
 		if (msg.getObject() instanceof MemberWelcomeNodeMessage) {
+			/**
+			 * This is a message used for new nodes when the synchronization is
+			 * not necessary
+			 */
 			MemberWelcomeNodeMessage message = (MemberWelcomeNodeMessage) msg
 					.getObject();
 			handleNewNodeCallback(message.getAllMembers(),
 					message.getDestinations(), true);
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessage) {
-			// If the message is a globalsync, we might not have our view info
-			// ready. So we must take that into account.
+			/**
+			 * If the message is a globalsync, we might not have our view info
+			 * ready. So we must take that into account.
+			 */
 			safelyProcess(msg);
 		} else if (msg.getObject() instanceof GlobalSyncNodeMessageAnswer) {
-			// In this case that's not the same, there is no problem.
+			/**
+			 * In this case that's not the same, there is no problem.
+			 */
 			onNewNodeSyncAnswer((GlobalSyncNodeMessageAnswer) msg.getObject());
 		} else if (msg.getObject() instanceof NewNodeReadyMessage) {
+			/**
+			 * Receives the notification of a new node being ready
+			 */
 			onNotifyNewNodeReady();
 		} else if (msg.getObject() instanceof SyncDoneNodeMessage) {
-			onNotifyGoneMessageReceived();
+			/**
+			 * 
+			 */
+			onNotifySyncMessageReceived();
 		} else if (msg.getObject() instanceof QueryNodeMessage) {
 			node.getQueryCount().incrementAndGet();
 			node.getSignalProcessor().onQueryReception(
@@ -86,7 +100,7 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		}
 	}
 
-	private void onNotifyGoneMessageReceived() {
+	private void onNotifySyncMessageReceived() {
 		updateService.notifySyncMessage();
 	}
 
@@ -94,13 +108,15 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		updateService.notifyNewNodeReady();
 	}
 
+	/**
+	 * Processes the arrived messages after the channel is connected
+	 * 
+	 */
 	private void safelyProcess(final Message msg) {
 		if (node.getChannel().isConnected()) {
 			onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
 
 		} else {
-			nodeLogger.log("Submitted for future tasks!");
-			// Submit the task for further execution
 			connectionPendingTasks.add(new Callable<Void>() {
 				@Override
 				public Void call() {
@@ -127,32 +143,36 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		nodeLogger.log("Got data! " + message.getSignalsMap().size()
 				+ " signals " + message.getBackupSignals().size() + " backups");
 
-		// We save the signals that were sent to us
+		/**
+		 * We save the signals that were sent to us
+		 */
 		storeLocalSignals(message);
 
-		// We either just store the data we receive
-		// Or we move it, depending on which our role is
+		/**
+		 * We either just store the data we receive or we move it, depending on
+		 * which our role is
+		 */
 		handleBackupSignals(msg, message);
 
-		// We send a message telling that we made the transaction
-		// This is an ACK that we're not dead
+		/**
+		 * We send a message telling that we made the transaction, this is an
+		 * ACK that we're not dead
+		 */
 		tellWereDone(msg);
 
-		// If we're a new node we tell we're no longer one
-		// After we got all the messages from all our neighbours
-
+		/**
+		 * If we're a new node we tell we're no longer new, after we got all the
+		 * messages from all our neighbours
+		 */
 		handleNewNodeCallback(message.getAllMembers(),
 				message.getDestinations(), message.isLastSyncMessage());
 
-		// nodeLogger.log("We are done!");
 	}
 
-	private synchronized void handleNewNodeCallback(
-			final List<Address> allMembers, final Set<Address> destinations,
-			final boolean isLastSyncMessage) {
+	private void handleNewNodeCallback(final List<Address> allMembers,
+			final Set<Address> destinations, final boolean isLastSyncMessage) {
 		if (node.isNew() && isLastSyncMessage) {
 			newNodePartsCount.addAndGet(1);
-			nodeLogger.log("New node check");
 			if (newNodePartsCount.get() == allMembers.size()
 					- destinations.size()) {
 				final Message newNodeReply = new Message(null);
@@ -161,38 +181,41 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 				node.setIsNew(false);
 				updateService.allowSync();
 			}
-
 		}
-
 	}
 
 	private void tellWereDone(final Message msg) {
 		final Message reply = msg.makeReply();
 		reply.setObject(new GlobalSyncNodeMessageAnswer(node.getAddress()));
 		sendSafeAnswer(reply);
-
 	}
 
 	private void handleBackupSignals(final Message msg,
 			final GlobalSyncNodeMessage message) {
 		synchronized (node.getBackupSignals()) {
-			// Copy mode is for when no backups are done
-			// If backups are already distributed then we proceed from this
-			// branch
+			/**
+			 * Copy mode is for when no backups are done if backups are already
+			 * distributed then we proceed from this branch
+			 */
 			if (message.isCopyMode()) {
-				// If this is a copy mode operation then each
-				// receiver stores the senders data a as backup
+				/**
+				 * If this is a copy mode operation then each receiver stores
+				 * the senders data a as backup
+				 */
 				copyBackups(msg, message);
 			} else {
 				if (message.getDestinations().contains(node.getAddress())) {
-					// If i'm one of the original receivers of this data,
-					// Then I save my backup copies, which are for me
+					/**
+					 * If i'm one of the original receivers of this data, Then I
+					 * save my backup copies, which are for me
+					 */
 					saveMyBackups(message);
 				} else {
-					// If i'm not, then the message contains
-					// data that I have backed up for the source
-					// but the source has moved that data.
-					// I must update my backups for that
+					/**
+					 * If i'm not, then the message contains data that I have
+					 * backed up for the source but the source has moved that
+					 * data. I must update my backups for that
+					 */
 					redistributeBackupsFromSource(msg, message);
 				}
 			}
@@ -271,6 +294,13 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 		}
 	}
 
+	/**
+	 * Sends a message and makes it await if the node is not yet formally
+	 * connected but has received a message
+	 * 
+	 * @param reply
+	 *            The message to send
+	 */
 	private void sendSafeAnswer(final Message reply) {
 		try {
 			synchronized (connectionPendingTasks) {

@@ -113,10 +113,8 @@ public class HighPerformanceSignalProcessorTest {
 
 					try {
 						Result newResult = first.findSimilarTo(sig);
-						// System.out.println("====== I GOT A RESULT!!!!");
 						if (last != null && !mustQuit.get()) {
 							Assert.assertEquals(last, newResult);
-							// System.out.println("They are equal");
 						}
 						last = newResult;
 
@@ -146,10 +144,8 @@ public class HighPerformanceSignalProcessorTest {
 				while (!mustQuit.get()) {
 					try {
 						Result newResult = lastNode.findSimilarTo(sig);
-						// System.out.println("====== I GOT A RESULT!!!!");
 						if (last != null && !mustQuit.get()) {
 							Assert.assertEquals(last, newResult);
-							// System.out.println("They are equal");
 						}
 						last = newResult;
 
@@ -172,16 +168,15 @@ public class HighPerformanceSignalProcessorTest {
 		} finally {
 			try {
 				Thread.sleep(5 * 1000);
-				System.out.println("Adding a new node");
 				controller.addNewNodes(1);
 				Thread.sleep(5 * 1000);
-				System.out.println("Adding a new node");
 				controller.addNewNodes(1);
 				Thread.sleep(5 * 1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} finally {
-				System.out.println("DONE!!!");
+				System.out
+						.println("DONE!!! Interrumpting threads! Might show exceptions");
 				mustQuit.set(true);
 				t.interrupt();
 				t2.interrupt();
