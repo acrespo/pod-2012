@@ -135,7 +135,7 @@ public class Node implements JGroupNode {
 	public NodeStats getStats() {
 		return new NodeStats(getAddress() != null ? getAddress().toString()
 				: "Sin canal", queryCount.get(), signals.size()
-				+ toDistributeSignals.size(), backupSignals.size(), false);
+				+ temporalSignals.size(), backupSignals.size(), false);
 	}
 
 	@Override
