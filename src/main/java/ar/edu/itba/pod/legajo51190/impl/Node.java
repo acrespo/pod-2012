@@ -163,16 +163,10 @@ public class Node implements JGroupNode {
 
 	public void exit() {
 		online.set(false);
-		synchronized (getToDistributeSignals()) {
-			synchronized (getLocalSignals()) {
-				synchronized (getRedistributionSignals()) {
-					getLocalSignals().clear();
-					getToDistributeSignals().clear();
-					getRedistributionSignals().clear();
-				}
-			}
-		}
-		System.out.println("Told to disconnect!");
+		getLocalSignals().clear();
+		getToDistributeSignals().clear();
+		getRedistributionSignals().clear();
+		getTemporalSignals().clear();
 		getChannel().disconnect();
 		getChannel().close();
 	}

@@ -105,6 +105,7 @@ public class MultiThreadedDistributedSignalProcessor implements
 	@Override
 	public void add(final Signal signal) throws RemoteException {
 		try {
+			node.getTemporalSignals().add(signal);
 			node.getToDistributeSignals().put(signal);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
