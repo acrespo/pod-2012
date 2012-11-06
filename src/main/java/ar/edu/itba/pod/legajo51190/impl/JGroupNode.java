@@ -51,4 +51,6 @@ public interface JGroupNode {
 	public Channel getChannel();
 
 	JGroupSignalProcessor getSignalProcessor();
+
+	Set<Signal> getTemporalSignals();
 }

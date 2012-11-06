@@ -136,9 +136,12 @@ public class MultiThreadedDistributedSignalProcessor implements
 		synchronized (node.getToDistributeSignals()) {
 			synchronized (node.getLocalSignals()) {
 				synchronized (node.getRedistributionSignals()) {
-					sigs.addAll(node.getToDistributeSignals());
-					sigs.addAll(node.getRedistributionSignals());
-					sigs.addAll(node.getLocalSignals());
+					synchronized (node.getTemporalSignals()) {
+						sigs.addAll(node.getTemporalSignals());
+						sigs.addAll(node.getToDistributeSignals());
+						sigs.addAll(node.getRedistributionSignals());
+						sigs.addAll(node.getLocalSignals());
+					}
 				}
 			}
 		}

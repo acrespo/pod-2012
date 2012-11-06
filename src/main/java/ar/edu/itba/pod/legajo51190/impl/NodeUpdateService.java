@@ -99,6 +99,7 @@ public class NodeUpdateService {
 						for (int k = 0; k < CHUNK_SIZE; k++) {
 							Signal sig = node.getToDistributeSignals().poll(
 									1000, TimeUnit.MILLISECONDS);
+
 							if (sig == null || signalsCopy.size() == CHUNK_SIZE) {
 								if (sig != null) {
 									node.getToDistributeSignals().add(sig);
@@ -138,8 +139,7 @@ public class NodeUpdateService {
 										allMinusWaiting);
 							}
 
-							node.getToDistributeSignals()
-									.removeAll(signalsCopy);
+							node.getTemporalSignals().removeAll(signalsCopy);
 
 							if (node.getToDistributeSignals().isEmpty()
 									&& node.getListener() != null) {

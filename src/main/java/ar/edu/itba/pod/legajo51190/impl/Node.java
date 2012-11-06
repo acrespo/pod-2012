@@ -44,6 +44,8 @@ public class Node implements JGroupNode {
 	private final JGroupSignalProcessor signalProcessor;
 	private boolean isNew = true;
 	private final Semaphore newNodeSemaphore = new Semaphore(0);
+	private final Set<Signal> temporalSignals = Collections
+			.newSetFromMap(new ConcurrentHashMap<Signal, Boolean>());
 
 	public Node(final NodeListener listener,
 			final JGroupSignalProcessor signalProcessor) throws Exception {
@@ -93,6 +95,11 @@ public class Node implements JGroupNode {
 	@Override
 	public BlockingQueue<Signal> getToDistributeSignals() {
 		return toDistributeSignals;
+	}
+
+	@Override
+	public Set<Signal> getTemporalSignals() {
+		return temporalSignals;
 	}
 
 	public void setDegraded(final boolean b) {
