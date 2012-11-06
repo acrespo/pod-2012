@@ -297,6 +297,8 @@ public class MultiThreadedDistributedSignalProcessor implements
 
 		if (node.isOnline() && node.isNew()) {
 			return new Result(signal);
+		} else {
+			nodeLogger.log("Im local!");
 		}
 
 		final BlockingQueue<Signal> querySignals = buildQuerySignalSet();
