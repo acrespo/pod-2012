@@ -14,7 +14,9 @@ import org.junit.Test;
 
 /**
  * Tests the synchronization between a set of Nodes instanciated inside a local
- * jGroup
+ * jGroup. THIS TEST IS NOT GUARANTEED TO PASS IN ALL COMPUTERS/PLATFORMS. IT
+ * MIGHT CONSIDER SITUATIONS THAT ARE OVER THE REQUIREMENTS OF THIS HOMEWORK. IT
+ * MIGHT ALSO BE FAULTY AS A TEST ITSELF.
  * 
  * @author cris
  */
@@ -85,8 +87,6 @@ public abstract class AbstractDistributedNodeTest {
 			localSize.put(jNode.getAddress(), jNode.getLocalSignals().size());
 
 			NodeLogger logger = new NodeLogger(jNode);
-
-			// logger.setEnabled(false);
 
 			logger.log("=== Local data: " + jNode.getLocalSignals().size());
 
@@ -195,9 +195,6 @@ public abstract class AbstractDistributedNodeTest {
 
 		controller.addNewNodes(5);
 
-		// assertNodeIsNotEmpty(controller.getNodesToTest().getFirst());
-		// assertNodeIsNotEmpty(controller.getNodesToTest().get(2));
-		// assertNodeIsNotEmpty(controller.getNodesToTest().getLast());
 		assertTotalAmountIs(2400);
 	}
 
@@ -237,7 +234,6 @@ public abstract class AbstractDistributedNodeTest {
 		controller.addSignalsToNode(controller.getNodesToTest().getLast(),
 				21600);
 
-		System.out.println("===== ASSERTING");
 		assertNodeIsNotEmpty(controller.getNodesToTest().getFirst());
 		assertNodeIsNotEmpty(controller.getNodesToTest().get(1));
 		assertNodeIsNotEmpty(controller.getNodesToTest().get(2));

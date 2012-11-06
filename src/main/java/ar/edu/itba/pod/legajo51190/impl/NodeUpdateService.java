@@ -270,7 +270,7 @@ public class NodeUpdateService {
 							if (isOK) {
 
 								nodeLogger.log("Awaiting ...");
-								if (!newMemberLatch.await(100000,
+								if (!newMemberLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!!");
 								}
@@ -279,7 +279,7 @@ public class NodeUpdateService {
 									tellOtherNodesImDoneRedistributingData();
 								}
 
-								if (!memberSyncLatch.await(100000,
+								if (!memberSyncLatch.await(10000,
 										TimeUnit.MILLISECONDS)) {
 									nodeLogger.log("TIMEOUTED!!! 2");
 								}

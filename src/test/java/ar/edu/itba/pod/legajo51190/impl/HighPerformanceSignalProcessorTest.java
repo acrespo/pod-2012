@@ -13,13 +13,20 @@ import junit.framework.Assert;
 import org.jgroups.ChannelListener;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.signal.source.RandomSource;
 
+/**
+ * Tests some cases that used to be broken before. THIS TEST IS NOT GUARANTEED
+ * TO PASS IN ALL COMPUTERS/PLATFORMS. IT MIGHT CONSIDER SITUATIONS THAT ARE
+ * OVER THE REQUIREMENTS OF THIS HOMEWORK. IT MIGHT ALSO BE FAULTY AS A TEST
+ * ITSELF.
+ * 
+ * @author cris
+ */
 public class HighPerformanceSignalProcessorTest {
 
 	private static NodeTestController controller;
@@ -53,8 +60,10 @@ public class HighPerformanceSignalProcessorTest {
 		controller.getNodesToTest().clear();
 	}
 
+	/**
+	 * Tests that the reads are all the same across nodes
+	 */
 	@Test
-	@Ignore
 	public void testMultipleAddConsistency() {
 
 		controller.addNewNodes(2);
@@ -74,6 +83,11 @@ public class HighPerformanceSignalProcessorTest {
 
 	}
 
+	/**
+	 * Tests that the consistency of reads is mantained when a query is asked
+	 * and the node is degraded. This was later reported as a non required
+	 * feature so I stopped taking care about this. It might pass or not.
+	 */
 	@Test
 	public void testDuringAddConsistency() throws InterruptedException {
 
