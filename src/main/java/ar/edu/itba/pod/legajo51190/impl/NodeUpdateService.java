@@ -82,7 +82,6 @@ public class NodeUpdateService {
 				new LinkedBlockingQueue<Runnable>()) {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
-				System.out.println("After excecute!");
 				if (taskCount.get() == 0) {
 					node.getDegraded().set(false);
 					updateOfNewNodesEnabled.set(getQueue().isEmpty());
