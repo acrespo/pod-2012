@@ -9,6 +9,7 @@ import java.rmi.registry.Registry;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.SPNode;
+import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.signal.source.RandomSource;
 
@@ -18,50 +19,54 @@ import ar.edu.itba.pod.signal.source.RandomSource;
 public class SampleClient {
 	private final String hostname;
 	private final int port;
-	
+
 	RandomSource src = new RandomSource();
 
-	public SampleClient(String hostname, int port) {
+	private final Signal defaultSignal;
+
+	public SampleClient(final String hostname, final int port) {
 		super();
 		this.hostname = hostname;
 		this.port = port;
+		defaultSignal = src.next();
 	}
 
 	public void start() {
-		this.waitForCommand();
+		waitForCommand();
 	}
 
 	public void waitForCommand() {
 		try {
 			Registry registry = LocateRegistry.getRegistry(hostname, port);
-			SignalProcessor	sp = (SignalProcessor) registry.lookup("SignalProcessor");
+			SignalProcessor sp = (SignalProcessor) registry
+					.lookup("SignalProcessor");
 			SPNode node = (SPNode) registry.lookup("SPNode");
-			
-			BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+
+			BufferedReader in = new BufferedReader(new InputStreamReader(
+					System.in));
 			printOptions();
 			while (true) {
 				String line = in.readLine().toLowerCase();
 				long start = System.nanoTime();
 				if (line.equals("1")) {
 					node.join("cluster");
-				}
-				else if (line.equals("2")) {
+				} else if (line.equals("2")) {
 					node.exit();
 				} else if (line.equals("3")) {
 					node.getStats().print(System.out);
 				} else if (line.equals("4")) {
-					Result results = sp.findSimilarTo(src.next());
+					Result results = sp.findSimilarTo(defaultSignal);
 					System.out.println(">>> Result: " + results);
 				} else if (line.equals("5")) {
-					this.generate(sp, 1);
+					generate(sp, 1);
 				} else if (line.equals("6")) {
-					this.generate(sp, 10);
+					generate(sp, 10);
 				} else if (line.equals("7")) {
-					this.generate(sp, 100);
+					generate(sp, 100);
 				} else if (line.equals("8")) {
-					this.generate(sp, 1000);
+					generate(sp, 50000);
 				} else if (line.equals("9")) {
-					this.generate(sp, 1000000);
+					generate(sp, 1000000);
 				} else if (line.equals("0")) {
 					return;
 				} else {
@@ -70,14 +75,16 @@ public class SampleClient {
 					continue;
 				}
 				long end = System.nanoTime();
-				System.out.println(">>> elapsed time: " + ((end - start) / 1000000000.0) + " seconds");
+				System.out.println(">>> elapsed time: " + (end - start)
+						/ 1000000000.0 + " seconds");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-	
-	private void generate(SignalProcessor sp, int amount) throws RemoteException {
+
+	private void generate(final SignalProcessor sp, final int amount)
+			throws RemoteException {
 		for (int i = 0; i < amount; i++) {
 			sp.add(src.next());
 		}
@@ -92,7 +99,7 @@ public class SampleClient {
 		System.out.println("5 - Add 1 signal");
 		System.out.println("6 - Add 10 signals");
 		System.out.println("7 - Add 100 signals");
-		System.out.println("8 - Add 1.000 signals");
+		System.out.println("8 - Add 50.000 signals");
 		System.out.println("9 - Add 1.000.000 signals");
 		System.out.println("0 - End");
 		System.out.print("> ");
@@ -101,14 +108,20 @@ public class SampleClient {
 
 	/**
 	 * Simple cluster client.
-	 * @param args Command line arguments: <hostname> <port> of the node's RMI Registry
+	 * 
+	 * @param args
+	 *            Command line arguments: <hostname> <port> of the node's RMI
+	 *            Registry
 	 */
-	public static void main(String[] args) throws RemoteException, NotBoundException {
+	public static void main(final String[] args) throws RemoteException,
+			NotBoundException {
 		if (args.length < 2) {
-			System.out.println("Command line parameters: SampleClient <host> <port> ");
+			System.out
+					.println("Command line parameters: SampleClient <host> <port> ");
 			return;
 		}
-		SampleClient client = new SampleClient(args[0], Integer.valueOf(args[1]));
+		SampleClient client = new SampleClient(args[0],
+				Integer.valueOf(args[1]));
 		client.start();
 	}
 }
