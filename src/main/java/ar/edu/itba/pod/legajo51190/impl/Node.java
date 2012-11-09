@@ -29,6 +29,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
 public class Node implements JGroupNode {
+	private final AtomicBoolean degraded = new AtomicBoolean(true);
 	private final Multimap<Address, Signal> backupSignals;
 	private Set<Address> aliveNodes = new HashSet<>();
 	private Set<String> aliveNodeNames = new HashSet<>();
@@ -62,6 +63,7 @@ public class Node implements JGroupNode {
 	@Override
 	public void reset() throws Exception {
 		setIsNew(true);
+		degraded.set(true);
 		online.set(false);
 		newNodeSemaphore.drainPermits();
 		setNodeView(null);
@@ -135,7 +137,8 @@ public class Node implements JGroupNode {
 	public NodeStats getStats() {
 		return new NodeStats(getAddress() != null ? getAddress().toString()
 				: "Sin canal", queryCount.get(), signals.size()
-				+ temporalSignals.size(), backupSignals.size(), false);
+				+ temporalSignals.size(), backupSignals.size(), getDegraded()
+				.get());
 	}
 
 	@Override
@@ -158,6 +161,7 @@ public class Node implements JGroupNode {
 		try {
 			getChannel().connect(name);
 			online.set(true);
+			getDegraded().set(true);
 		} catch (Exception e) {
 			throw new RemoteException(e.getMessage());
 		}
@@ -166,6 +170,7 @@ public class Node implements JGroupNode {
 
 	public void exit() {
 		online.set(false);
+		getDegraded().set(true);
 		getLocalSignals().clear();
 		getToDistributeSignals().clear();
 		getRedistributionSignals().clear();
@@ -192,6 +197,10 @@ public class Node implements JGroupNode {
 
 	public AtomicInteger getQueryCount() {
 		return queryCount;
+	}
+
+	public AtomicBoolean getDegraded() {
+		return degraded;
 	}
 
 }

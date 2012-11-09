@@ -120,6 +120,8 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 	 * 
 	 */
 	private void safelyProcess(final Message msg) {
+		node.getDegraded().set(true);
+
 		if (node.getChannel().isConnected()) {
 			onNewNodeSync(msg, (GlobalSyncNodeMessage) msg.getObject());
 
@@ -187,7 +189,17 @@ public class NodeReceiver extends BaseJGroupNodeReceiver {
 				sendSafeAnswer(newNodeReply);
 				node.setIsNew(false);
 				updateService.allowSync();
+				newNodePartsCount.set(0);
+				node.getDegraded().set(false);
 			}
+		} else if (isLastSyncMessage) {
+			newNodePartsCount.addAndGet(1);
+			if (newNodePartsCount.get() == allMembers.size()
+					- destinations.size()) {
+				newNodePartsCount.set(0);
+				node.getDegraded().set(false);
+			}
+
 		}
 	}
 

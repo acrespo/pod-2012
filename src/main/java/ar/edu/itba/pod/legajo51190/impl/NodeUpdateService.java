@@ -11,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jgroups.Address;
 import org.jgroups.Message;
@@ -26,6 +27,8 @@ import com.google.common.collect.Sets;
 public class NodeUpdateService {
 
 	private static final int CHUNK_SIZE = 5000;
+
+	private final AtomicInteger taskCount = new AtomicInteger(0);
 
 	/**
 	 * Represents the addresses awaiting for response when a synchronization
@@ -79,7 +82,9 @@ public class NodeUpdateService {
 				new LinkedBlockingQueue<Runnable>()) {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
-				if (nodeSyncService.getActiveCount() == 0) {
+				System.out.println("After excecute!");
+				if (taskCount.get() == 0) {
+					node.getDegraded().set(false);
 					updateOfNewNodesEnabled.set(getQueue().isEmpty());
 				}
 			}
@@ -116,11 +121,14 @@ public class NodeUpdateService {
 								&& node.getChannel() != null
 								&& node.getChannel().isConnected()
 								&& signalsCopy.size() > 0) {
+
+							node.getDegraded().set(true);
 							/**
 							 * Now we can send the copies to the other nodes
 							 */
 							sendCopies(node, signalsCopy, copyOfBackupSignals);
 
+							node.getDegraded().set(false);
 						}
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -196,6 +204,10 @@ public class NodeUpdateService {
 	}
 
 	public void updateFromView(final View new_view) {
+
+		node.getDegraded().set(true);
+		taskCount.incrementAndGet();
+
 		nodeSyncService.submit(new Runnable() {
 			@Override
 			public void run() {
@@ -204,6 +216,7 @@ public class NodeUpdateService {
 					if (new_view.getMembers().size() == 1) {
 						node.setIsNew(false);
 						node.getNewSemaphore().release();
+						node.getDegraded().set(false);
 					}
 
 					if (node.getLastView() != null) {
@@ -262,6 +275,8 @@ public class NodeUpdateService {
 					node.setNodeView(new_view);
 				} catch (Exception e) {
 					e.printStackTrace();
+				} finally {
+					taskCount.decrementAndGet();
 				}
 			}
 
