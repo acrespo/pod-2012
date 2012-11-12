@@ -83,7 +83,7 @@ public class NodeUpdateService {
 			@Override
 			protected void afterExecute(final Runnable r, final Throwable t) {
 				if (taskCount.get() == 0) {
-					node.getDegraded().set(false);
+					node.getDegraded().set(node.getAliveNodes().size() == 1);
 					updateOfNewNodesEnabled.set(getQueue().isEmpty());
 				}
 			}

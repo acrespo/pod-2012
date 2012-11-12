@@ -174,6 +174,7 @@ public class Node implements JGroupNode {
 		getLocalSignals().clear();
 		getToDistributeSignals().clear();
 		getRedistributionSignals().clear();
+		getBackupSignals().clear();
 		getTemporalSignals().clear();
 		getChannel().disconnect();
 	}
